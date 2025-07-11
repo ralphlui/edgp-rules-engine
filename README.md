@@ -1,17 +1,75 @@
-# edgp-rules-engine FastAPI project
+# edgp-rules-engine
 
-## Setup
+## Overview
+The `edgp-rules-engine` is a FastAPI microservice designed for managing expectation rules. It provides a RESTful API to create, retrieve, and manage rules that define expectations for data validation.
 
-1. Install dependencies:
-   ```sh
-   /usr/bin/python3 -m pip install -r requirements.txt
+## Project Structure
+```
+edgp-rules-engine
+├── app
+│   ├── __init__.py
+│   ├── main.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   └── routes.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   └── config.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   └── rule.py
+│   └── rules
+│       ├── __init__.py
+│       └── expectation_rules.py
+├── tests
+│   ├── __init__.py
+│   └── test_rules.py
+├── .env
+├── requirements.txt
+└── README.md
+```
+
+## Installation
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd edgp-rules-engine
    ```
 
-2. Run the FastAPI app:
-   ```sh
-   /usr/bin/python3 -m uvicorn main:app --reload
+2. Create a virtual environment:
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
    ```
 
-Visit http://127.0.0.1:8000 in your browser to see the API.
+3. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
 
-API docs available at http://127.0.0.1:8000/docs
+## Configuration
+- Create a `.env` file in the root directory to configure environment variables. For example:
+  ```
+  PORT=8000
+  ```
+
+## Running the Application
+To start the FastAPI application, run:
+```
+uvicorn app.main:app --host 0.0.0.0 --port $PORT --reload
+```
+
+## API Endpoints
+- `GET /api/rules`: Retrieve all expectation rules. The response includes rule name, column name, and the value to be checked.
+
+## Testing
+To run the tests, use:
+```
+pytest tests/
+```
+
+## Contributing
+Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.

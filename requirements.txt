@@ -1,2 +1,6 @@
-fastapi
+FastAPI
 uvicorn
+python-dotenv
+pydantic
+pytest
+great_expectations
