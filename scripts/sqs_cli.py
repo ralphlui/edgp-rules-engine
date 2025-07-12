@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 # Add the app directory to the path
-sys.path.append('/Users/jjfwang/Documents/02-NUS/01-Capstone/edgp-rules-engine')
+sys.path.insert(0, '/Users/jjfwang/Documents/02-NUS/01-Capstone/edgp-rules-engine')
 
 def create_test_message() -> Dict[str, Any]:
     """Create a test validation message"""

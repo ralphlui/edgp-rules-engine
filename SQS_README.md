@@ -33,6 +33,43 @@ The SQS integration enables the EDGP Rules Engine to process data validation req
                        └─────────────────┘
 ```
 
+## Message Processing Flow
+
+The system follows this complete workflow:
+
+1. **Input**: Validation requests are sent to the input SQS queue
+2. **Processing**: Workers poll the input queue and process validation requests
+3. **Output**: Results are automatically sent to the output SQS queue  
+4. **Callbacks**: Optional webhook notifications are sent
+5. **Error Handling**: Failed messages are retried or sent to DLQ
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Input Queue   │───▶│  Workers Pool   │───▶│  Output Queue   │
+│                 │    │                 │    │                 │
+│ Validation      │    │ • Worker 1      │    │ Validation      │
+│ Requests        │    │ • Worker 2      │    │ Results         │
+│                 │    │ • Worker 3      │    │                 │
+│                 │    │ • Worker 4      │    │ Results Auto-   │
+│                 │    │                 │    │ sent on Complete│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                 │
+                                 ▼
+                       ┌─────────────────┐
+                       │   Dead Letter   │
+                       │     Queue       │
+                       │                 │
+                       │ Failed Messages │
+                       └─────────────────┘
+```
+
+### Key Features
+
+- **Automatic Output**: All processed messages (success or failure) are sent to output queue
+- **Result Tracking**: Each result includes processing time, worker ID, and detailed status
+- **Error Reporting**: Failed validations include error messages and codes in output
+- **Correlation IDs**: Maintain request-response correlation for tracking
+
 ## Configuration
 
 ### Environment Variables
@@ -182,18 +219,35 @@ curl http://localhost:8008/sqs/status
 Use the included CLI tool for testing and management:
 
 ```bash
+# Check output queue for results
+python scripts/sqs_cli.py check-output
+
 # Show current configuration
-python sqs_cli.py config
+python scripts/sqs_cli.py config
 
 # Check SQS health
-python sqs_cli.py health
+python scripts/sqs_cli.py health
 
 # Get queue statistics  
-python sqs_cli.py stats
+python scripts/sqs_cli.py stats
 
 # Send a test message
-python sqs_cli.py send-test
+python scripts/sqs_cli.py send-test
 ```
+
+## Examples and Testing
+
+Explore the SQS functionality with provided examples:
+
+```bash
+# Complete workflow demonstration
+python examples/demo_sqs_workflow.py
+
+# Test output queue functionality
+python examples/test_output_queue.py
+```
+
+See the `examples/` directory for more detailed usage scenarios.
 
 ## Error Handling
 

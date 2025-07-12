@@ -73,9 +73,8 @@ class MessageProcessor:
                 failed_rules=sum(1 for r in validation_response.get("results", []) if not r.get("success", True))
             )
             
-            # Send response to output queue if configured
-            if self.settings.output_queue_url:
-                self.sqs_client.send_message(sqs_response.dict())
+            # Always send response to output queue (required for SQS workflow)
+            output_sent = await self._send_to_output_queue(sqs_response)
             
             # Send callback if configured
             if message.body.callback_url:
@@ -113,6 +112,9 @@ class MessageProcessor:
                 error_message=str(e),
                 error_code=type(e).__name__
             )
+            
+            # Send error response to output queue for tracking
+            await self._send_to_output_queue(error_response)
             
             return ProcessingResult(
                 success=False,
@@ -168,6 +170,38 @@ class MessageProcessor:
                         
         except Exception as e:
             logger.error(f"Failed to send callback to {callback_url}: {e}")
+
+    async def _send_to_output_queue(self, response: SQSValidationResponse) -> bool:
+        """
+        Send validation response to output SQS queue
+        
+        Args:
+            response: Validation response to send
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Always try to send to output queue if configured
+            if self.settings.output_queue_url:
+                message_id = self.sqs_client.send_message(
+                    response.dict(),
+                    queue_url=self.settings.output_queue_url
+                )
+                
+                if message_id:
+                    logger.info(f"Response sent to output queue: {message_id} for message {response.message_id}")
+                    return True
+                else:
+                    logger.error(f"Failed to send response to output queue for message {response.message_id}")
+                    return False
+            else:
+                logger.warning("Output queue URL not configured, cannot send response")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error sending response to output queue for message {response.message_id}: {e}")
+            return False
 
     def process_batch(self, messages: List[SQSMessageWrapper]) -> List[ProcessingResult]:
         """
