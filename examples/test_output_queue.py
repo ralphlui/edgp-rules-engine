@@ -6,7 +6,9 @@ import json
 import sys
 from datetime import datetime
 
-sys.path.insert(0, '/Users/jjfwang/Documents/02-NUS/01-Capstone/edgp-rules-engine')
+# Add the parent directory to the path for imports
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 async def test_output_queue():
     """Test that messages are properly sent to output queue after processing"""
