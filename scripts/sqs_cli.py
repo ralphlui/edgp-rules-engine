@@ -10,8 +10,9 @@ import argparse
 from datetime import datetime
 from typing import Dict, Any
 
-# Add the app directory to the path
-sys.path.insert(0, '/Users/jjfwang/Documents/02-NUS/01-Capstone/edgp-rules-engine')
+# Add the parent directory to the path for imports
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def create_test_message() -> Dict[str, Any]:
     """Create a test validation message"""

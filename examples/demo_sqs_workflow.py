@@ -8,7 +8,9 @@ import time
 import sys
 from datetime import datetime
 
-sys.path.insert(0, '/Users/jjfwang/Documents/02-NUS/01-Capstone/edgp-rules-engine')
+# Add the parent directory to the path for imports
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 async def demo_complete_workflow():
     """Demonstrate the complete SQS workflow"""
