@@ -51,12 +51,13 @@ edgp-rules-engine
 - Create a `.env` file in the root directory to configure environment variables. For example:
   ```
   PORT=8000
+  HOST=localhost
   ```
 
 ## Running the Application
 To start the FastAPI application, run:
 ```
-uvicorn app.main:app --host 0.0.0.0 --port $PORT --reload
+uvicorn app.main:app --host $HOST --port $PORT --reload
 ```
 
 ## API Endpoints
