@@ -1,12 +1,14 @@
-FastAPI
-uvicorn
-python-dotenv
-pydantic
-pytest
-great_expectations
-pandas
+FastAPI>=0.104.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+pytest>=7.0.0
+pandas>=1.5.0
 # AWS SQS Dependencies
-boto3
-botocore
+boto3>=1.26.0
+botocore>=1.29.0
 # HTTP client for callbacks
-aiohttp
+aiohttp>=3.8.0
+# Note: great_expectations temporarily commented out due to potential compatibility issues
+# great_expectations

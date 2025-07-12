@@ -1,7 +1,13 @@
 """
 Great Expectations utilities for the validation system
 """
-import great_expectations as gx
+try:
+    import great_expectations as gx
+    GX_AVAILABLE = True
+except ImportError:
+    gx = None
+    GX_AVAILABLE = False
+
 import pandas as pd
 from typing import Dict, Any, List
 
@@ -14,10 +20,16 @@ class GXValidator:
         self.context = None
         self.datasource = None
         self.data_asset = None
-        self._setup_context()
+        if GX_AVAILABLE:
+            self._setup_context()
+        else:
+            print("⚠️ Great Expectations not available - using fallback validation")
     
     def _setup_context(self):
         """Set up Great Expectations context with minimal configuration"""
+        if not GX_AVAILABLE:
+            return
+            
         try:
             # Create ephemeral context (in-memory, no file system)
             self.context = gx.get_context(mode='ephemeral')
@@ -70,6 +82,9 @@ _gx_validator = None
 
 def get_gx_validator() -> GXValidator:
     """Get the global Great Expectations validator instance"""
+    if not GX_AVAILABLE:
+        raise RuntimeError("Great Expectations is not available")
+        
     global _gx_validator
     if _gx_validator is None:
         _gx_validator = GXValidator()
@@ -89,6 +104,15 @@ def validate_with_gx(data: List[Dict[str, Any]], expectation_type: str, column: 
     Returns:
         Dict containing validation results
     """
+    if not GX_AVAILABLE:
+        return {
+            "success": False,
+            "message": None,
+            "error": f"Great Expectations not available (Python 3.13 compatibility issue). Expectation '{expectation_type}' not supported.",
+            "result": {},
+            "meta": {}
+        }
+        
     try:
         # Convert data to DataFrame
         df = pd.DataFrame(data)

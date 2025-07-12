@@ -1,8 +1,21 @@
-from typing import List
+from typing import List, Dict, Any
 from pydantic import BaseModel
 
-from app.models.rule import Rule
+
+class ValidationResult(BaseModel):
+    rule: str
+    column: str
+    success: bool
+    message: str
+    details: Dict[str, Any]
+
+
+class ValidationSummary(BaseModel):
+    total_rules: int
+    passed: int
+    failed: int
 
 
 class ValidationResponse(BaseModel):
-    result: List[dict]
+    results: List[ValidationResult]
+    summary: ValidationSummary
