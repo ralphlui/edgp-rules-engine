@@ -79,8 +79,12 @@ python app/main.py
 
 ### Option 2: Using uvicorn directly
 ```bash
-uvicorn app.main:app --host localhost --port port --reload
+uvicorn app.main:app --host localhost --port 8008 --reload
 ```
+
+**Note:** You can use environment variables or specific values:
+- With specific values: `uvicorn app.main:app --host localhost --port 8008 --reload`
+- With environment variables: `uvicorn app.main:app --host $HOST --port $PORT --reload` (Unix/Mac)
 
 The server will start and display:
 - 🌐 **API**: http://localhost:8008

@@ -73,6 +73,7 @@ if __name__ == "__main__":
     print(f"URL: http://{settings.host}:{settings.port}")
     print(f"Docs: http://{settings.host}:{settings.port}/docs")
     print(f"Environment file: .env")
+    print(f"CORS: ✅ Enabled ({len(settings.allowed_origins)} origins)")
     print("=" * 60)
     
     uvicorn.run(
