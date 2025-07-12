@@ -41,6 +41,8 @@ python -m app.main
 
 The API will be available at `http://localhost:8008`
 
+**Note:** The application uses lazy loading for validators to improve startup time. Some validators that depend on Great Expectations may show compatibility warnings with Python 3.13 but will gracefully degrade to fallback validation methods.
+
 ### Basic Usage
 
 Send a POST request to `/validate` with your data and validation rules:
@@ -547,8 +549,7 @@ edgp-rules-engine/
 ├── app/
 │   ├── main.py              # FastAPI application entry point
 │   ├── api/                 # API route definitions
-│   │   ├── routes.py        # Core validation routes
-│   │   └── sqs_routes.py    # SQS management routes
+│   │   └── routes.py        # All routes (validation + SQS management)
 │   ├── core/                # Core configuration
 │   │   └── config.py        # Environment and CORS config
 │   ├── models/              # Pydantic models

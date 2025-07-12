@@ -1,107 +1,126 @@
 from typing import Dict, Callable, List, Any
 from app.models.rule import Rule
+import importlib
 
-# Import all validator functions
-from app.validators.expect_column_distinct_values_to_be_in_set import validate_column_distinct_values_to_be_in_set
-from app.validators.expect_column_values_to_be_in_set import validate_column_values_to_be_in_set
-from app.validators.expect_column_values_to_not_be_in_set import validate_column_values_to_not_be_in_set
-from app.validators.expect_column_values_to_be_between import validate_column_values_to_be_between
-from app.validators.expect_column_value_lengths_to_be_between import validate_column_value_lengths_to_be_between
-from app.validators.expect_column_values_to_match_regex import validate_column_values_to_match_regex
-from app.validators.expect_column_values_to_not_match_regex import validate_column_values_to_not_match_regex
-from app.validators.expect_column_values_to_match_strftime_format import validate_column_values_to_match_strftime_format
-from app.validators.expect_column_values_to_be_unique import validate_column_values_to_be_unique
-from app.validators.expect_compound_columns_to_be_unique import validate_compound_columns_to_be_unique
-from app.validators.expect_column_mean_to_be_between import validate_column_mean_to_be_between
-from app.validators.expect_column_median_to_be_between import validate_column_median_to_be_between
-from app.validators.expect_column_sum_to_be_between import validate_column_sum_to_be_between
-from app.validators.expect_column_min_to_be_between import validate_column_min_to_be_between
-from app.validators.expect_column_max_to_be_between import validate_column_max_to_be_between
-from app.validators.expect_column_proportion_of_unique_values_to_be_between import validate_column_proportion_of_unique_values_to_be_between
-from app.validators.expect_column_values_to_be_of_type import validate_column_values_to_be_of_type
-from app.validators.expect_column_values_to_be_in_type_list import validate_column_values_to_be_in_type_list
-from app.validators.expect_column_values_to_be_dateutil_parseable import validate_column_values_to_be_dateutil_parseable
-from app.validators.expect_column_values_to_match_like_pattern import validate_column_values_to_match_like_pattern
-from app.validators.expect_column_values_to_not_match_like_pattern import validate_column_values_to_not_match_like_pattern
-from app.validators.expect_column_values_to_be_boolean import validate_column_values_to_be_boolean
-from app.validators.expect_column_values_to_be_none import validate_column_values_to_be_none
-from app.validators.expect_column_values_to_not_be_none import validate_column_values_to_not_be_none
-from app.validators.expect_column_value_lengths_to_equal import validate_column_value_lengths_to_equal
-from app.validators.expect_column_values_to_be_positive import validate_column_values_to_be_positive
-from app.validators.expect_column_values_to_be_less_than import validate_column_values_to_be_less_than
-from app.validators.expect_column_values_to_be_greater_than import validate_column_values_to_be_greater_than
-from app.validators.expect_column_values_to_be_increasing import validate_column_values_to_be_increasing
-from app.validators.expect_column_values_to_be_decreasing import validate_column_values_to_be_decreasing
-from app.validators.expect_column_pair_values_a_to_be_greater_than_b import validate_column_pair_values_a_to_be_greater_than_b
-from app.validators.expect_column_pair_values_to_be_equal import validate_column_pair_values_to_be_equal
-from app.validators.expect_table_columns_to_match_ordered_list import validate_table_columns_to_match_ordered_list
-from app.validators.expect_table_column_count_to_be_between import validate_table_column_count_to_be_between
-from app.validators.expect_table_row_count_to_equal import validate_table_row_count_to_equal
-from app.validators.expect_table_row_count_to_be_between import validate_table_row_count_to_be_between
-from app.validators.expect_table_custom_query_to_return_no_rows import validate_table_custom_query_to_return_no_rows
-from app.validators.expect_column_to_exist import validate_column_to_exist
-from app.validators.expect_column_values_to_be_valid_email import validate_column_values_to_be_valid_email
-from app.validators.expect_column_values_to_be_valid_url import validate_column_values_to_be_valid_url
-from app.validators.expect_column_values_to_be_valid_ipv4 import validate_column_values_to_be_valid_ipv4
-from app.validators.expect_column_values_to_be_valid_credit_card_number import validate_column_values_to_be_valid_credit_card_number
-from app.validators.expect_column_values_to_be_after import validate_column_values_to_be_after
-from app.validators.expect_column_values_to_be_before import validate_column_values_to_be_before
-from app.validators.expect_column_values_to_be_between_dates import validate_column_values_to_be_between_dates
-
-
-# Registry mapping rule names to their validation functions
-VALIDATOR_REGISTRY: Dict[str, Callable[[List[Dict[str, Any]], Rule], Dict[str, Any]]] = {
-    "ExpectColumnDistinctValuesToBeInSet": validate_column_distinct_values_to_be_in_set,
-    "ExpectColumnValuesToBeInSet": validate_column_values_to_be_in_set,
-    "ExpectColumnValuesToNotBeInSet": validate_column_values_to_not_be_in_set,
-    "ExpectColumnValuesToBeBetween": validate_column_values_to_be_between,
-    "ExpectColumnValueLengthsToBeBetween": validate_column_value_lengths_to_be_between,
-    "ExpectColumnValuesToMatchRegex": validate_column_values_to_match_regex,
-    "ExpectColumnValuesToNotMatchRegex": validate_column_values_to_not_match_regex,
-    "ExpectColumnValuesToMatchStrftimeFormat": validate_column_values_to_match_strftime_format,
-    "ExpectColumnValuesToBeUnique": validate_column_values_to_be_unique,
-    "ExpectCompoundColumnsToBeUnique": validate_compound_columns_to_be_unique,
-    "ExpectColumnMeanToBeBetween": validate_column_mean_to_be_between,
-    "ExpectColumnMedianToBeBetween": validate_column_median_to_be_between,
-    "ExpectColumnSumToBeBetween": validate_column_sum_to_be_between,
-    "ExpectColumnMinToBeBetween": validate_column_min_to_be_between,
-    "ExpectColumnMaxToBeBetween": validate_column_max_to_be_between,
-    "ExpectColumnProportionOfUniqueValuesToBeBetween": validate_column_proportion_of_unique_values_to_be_between,
-    "ExpectColumnValuesToBeOfType": validate_column_values_to_be_of_type,
-    "ExpectColumnValuesToBeInTypeList": validate_column_values_to_be_in_type_list,
-    "ExpectColumnValuesToBeDateutilParseable": validate_column_values_to_be_dateutil_parseable,
-    "ExpectColumnValuesToMatchLikePattern": validate_column_values_to_match_like_pattern,
-    "ExpectColumnValuesToNotMatchLikePattern": validate_column_values_to_not_match_like_pattern,
-    "ExpectColumnValuesToBeBoolean": validate_column_values_to_be_boolean,
-    "ExpectColumnValuesToBeNone": validate_column_values_to_be_none,
-    "ExpectColumnValuesToNotBeNone": validate_column_values_to_not_be_none,
-    "ExpectColumnValueLengthsToEqual": validate_column_value_lengths_to_equal,
-    "ExpectColumnValuesToBePositive": validate_column_values_to_be_positive,
-    "ExpectColumnValuesToBeLessThan": validate_column_values_to_be_less_than,
-    "ExpectColumnValuesToBeGreaterThan": validate_column_values_to_be_greater_than,
-    "ExpectColumnValuesToBeIncreasing": validate_column_values_to_be_increasing,
-    "ExpectColumnValuesToBeDecreasing": validate_column_values_to_be_decreasing,
-    "ExpectColumnPairValuesAToBeGreaterThanB": validate_column_pair_values_a_to_be_greater_than_b,
-    "ExpectColumnPairValuesToBeEqual": validate_column_pair_values_to_be_equal,
-    "ExpectTableColumnsToMatchOrderedList": validate_table_columns_to_match_ordered_list,
-    "ExpectTableColumnCountToBeBetween": validate_table_column_count_to_be_between,
-    "ExpectTableRowCountToEqual": validate_table_row_count_to_equal,
-    "ExpectTableRowCountToBeBetween": validate_table_row_count_to_be_between,
-    "ExpectTableCustomQueryToReturnNoRows": validate_table_custom_query_to_return_no_rows,
-    "ExpectColumnToExist": validate_column_to_exist,
-    "ExpectColumnValuesToBeValidEmail": validate_column_values_to_be_valid_email,
-    "ExpectColumnValuesToBeValidUrl": validate_column_values_to_be_valid_url,
-    "ExpectColumnValuesToBeValidIPv4": validate_column_values_to_be_valid_ipv4,
-    "ExpectColumnValuesToBeValidCreditCardNumber": validate_column_values_to_be_valid_credit_card_number,
-    "ExpectColumnValuesToBeAfter": validate_column_values_to_be_after,
-    "ExpectColumnValuesToBeBefore": validate_column_values_to_be_before,
-    "ExpectColumnValuesToBeBetweenDates": validate_column_values_to_be_between_dates,
+# Lazy import mapping - validators are imported only when needed
+VALIDATOR_MAPPING = {
+    "expect_column_distinct_values_to_be_in_set": ("app.validators.expect_column_distinct_values_to_be_in_set", "validate_column_distinct_values_to_be_in_set"),
+    "expect_column_values_to_be_in_set": ("app.validators.expect_column_values_to_be_in_set", "validate_column_values_to_be_in_set"),
+    "expect_column_values_to_not_be_in_set": ("app.validators.expect_column_values_to_not_be_in_set", "validate_column_values_to_not_be_in_set"),
+    "expect_column_values_to_be_between": ("app.validators.expect_column_values_to_be_between", "validate_column_values_to_be_between"),
+    "expect_column_value_lengths_to_be_between": ("app.validators.expect_column_value_lengths_to_be_between", "validate_column_value_lengths_to_be_between"),
+    "expect_column_values_to_match_regex": ("app.validators.expect_column_values_to_match_regex", "validate_column_values_to_match_regex"),
+    "expect_column_values_to_not_match_regex": ("app.validators.expect_column_values_to_not_match_regex", "validate_column_values_to_not_match_regex"),
+    "expect_column_values_to_match_strftime_format": ("app.validators.expect_column_values_to_match_strftime_format", "validate_column_values_to_match_strftime_format"),
+    "expect_column_values_to_be_unique": ("app.validators.expect_column_values_to_be_unique", "validate_column_values_to_be_unique"),
+    "expect_compound_columns_to_be_unique": ("app.validators.expect_compound_columns_to_be_unique", "validate_compound_columns_to_be_unique"),
+    "expect_column_mean_to_be_between": ("app.validators.expect_column_mean_to_be_between", "validate_column_mean_to_be_between"),
+    "expect_column_median_to_be_between": ("app.validators.expect_column_median_to_be_between", "validate_column_median_to_be_between"),
+    "expect_column_sum_to_be_between": ("app.validators.expect_column_sum_to_be_between", "validate_column_sum_to_be_between"),
+    "expect_column_min_to_be_between": ("app.validators.expect_column_min_to_be_between", "validate_column_min_to_be_between"),
+    "expect_column_max_to_be_between": ("app.validators.expect_column_max_to_be_between", "validate_column_max_to_be_between"),
+    "expect_column_proportion_of_unique_values_to_be_between": ("app.validators.expect_column_proportion_of_unique_values_to_be_between", "validate_column_proportion_of_unique_values_to_be_between"),
+    "expect_column_values_to_be_of_type": ("app.validators.expect_column_values_to_be_of_type", "validate_column_values_to_be_of_type"),
+    "expect_column_values_to_be_in_type_list": ("app.validators.expect_column_values_to_be_in_type_list", "validate_column_values_to_be_in_type_list"),
+    "expect_column_values_to_be_dateutil_parseable": ("app.validators.expect_column_values_to_be_dateutil_parseable", "validate_column_values_to_be_dateutil_parseable"),
+    "expect_column_values_to_match_like_pattern": ("app.validators.expect_column_values_to_match_like_pattern", "validate_column_values_to_match_like_pattern"),
+    "expect_column_values_to_not_match_like_pattern": ("app.validators.expect_column_values_to_not_match_like_pattern", "validate_column_values_to_not_match_like_pattern"),
+    "expect_column_values_to_be_boolean": ("app.validators.expect_column_values_to_be_boolean", "validate_column_values_to_be_boolean"),
+    "expect_column_values_to_be_none": ("app.validators.expect_column_values_to_be_none", "validate_column_values_to_be_none"),
+    "expect_column_values_to_not_be_none": ("app.validators.expect_column_values_to_not_be_none", "validate_column_values_to_not_be_none"),
+    "expect_column_value_lengths_to_equal": ("app.validators.expect_column_value_lengths_to_equal", "validate_column_value_lengths_to_equal"),
+    "expect_column_values_to_be_positive": ("app.validators.expect_column_values_to_be_positive", "validate_column_values_to_be_positive"),
+    "expect_column_values_to_be_less_than": ("app.validators.expect_column_values_to_be_less_than", "validate_column_values_to_be_less_than"),
+    "expect_column_values_to_be_greater_than": ("app.validators.expect_column_values_to_be_greater_than", "validate_column_values_to_be_greater_than"),
+    "expect_column_values_to_be_increasing": ("app.validators.expect_column_values_to_be_increasing", "validate_column_values_to_be_increasing"),
+    "expect_column_values_to_be_decreasing": ("app.validators.expect_column_values_to_be_decreasing", "validate_column_values_to_be_decreasing"),
+    "expect_column_pair_values_a_to_be_greater_than_b": ("app.validators.expect_column_pair_values_a_to_be_greater_than_b", "validate_column_pair_values_a_to_be_greater_than_b"),
+    "expect_column_pair_values_to_be_equal": ("app.validators.expect_column_pair_values_to_be_equal", "validate_column_pair_values_to_be_equal"),
+    "expect_table_columns_to_match_ordered_list": ("app.validators.expect_table_columns_to_match_ordered_list", "validate_table_columns_to_match_ordered_list"),
+    "expect_table_column_count_to_be_between": ("app.validators.expect_table_column_count_to_be_between", "validate_table_column_count_to_be_between"),
+    "expect_table_row_count_to_equal": ("app.validators.expect_table_row_count_to_equal", "validate_table_row_count_to_equal"),
+    "expect_table_row_count_to_be_between": ("app.validators.expect_table_row_count_to_be_between", "validate_table_row_count_to_be_between"),
+    "expect_table_custom_query_to_return_no_rows": ("app.validators.expect_table_custom_query_to_return_no_rows", "validate_table_custom_query_to_return_no_rows"),
+    "expect_column_to_exist": ("app.validators.expect_column_to_exist", "validate_column_to_exist"),
+    "expect_column_values_to_be_valid_email": ("app.validators.expect_column_values_to_be_valid_email", "validate_column_values_to_be_valid_email"),
+    "expect_column_values_to_be_valid_url": ("app.validators.expect_column_values_to_be_valid_url", "validate_column_values_to_be_valid_url"),
+    "expect_column_values_to_be_valid_ipv4": ("app.validators.expect_column_values_to_be_valid_ipv4", "validate_column_values_to_be_valid_ipv4"),
+    "expect_column_values_to_be_valid_credit_card_number": ("app.validators.expect_column_values_to_be_valid_credit_card_number", "validate_column_values_to_be_valid_credit_card_number"),
+    "expect_column_values_to_be_after": ("app.validators.expect_column_values_to_be_after", "validate_column_values_to_be_after"),
+    "expect_column_values_to_be_before": ("app.validators.expect_column_values_to_be_before", "validate_column_values_to_be_before"),
+    "expect_column_values_to_be_between_dates": ("app.validators.expect_column_values_to_be_between_dates", "validate_column_values_to_be_between_dates"),
 }
 
+def _get_validator_function(rule_name: str) -> Callable:
+    """Lazy-load validator function by rule name"""
+    if rule_name not in VALIDATOR_MAPPING:
+        raise ValueError(f"Unknown validation rule: {rule_name}")
+    
+    module_name, function_name = VALIDATOR_MAPPING[rule_name]
+    try:
+        module = importlib.import_module(module_name)
+        return getattr(module, function_name)
+    except ImportError as e:
+        raise ImportError(f"Could not import validator {rule_name}: {e}")
+    except AttributeError as e:
+        raise AttributeError(f"Validator function {function_name} not found in {module_name}: {e}")
+
+
+# Mapping old-style rule names to new-style rule names for backward compatibility
+LEGACY_RULE_MAPPING = {
+    "ExpectColumnDistinctValuesToBeInSet": "expect_column_distinct_values_to_be_in_set",
+    "ExpectColumnValuesToBeInSet": "expect_column_values_to_be_in_set",
+    "ExpectColumnValuesToNotBeInSet": "expect_column_values_to_not_be_in_set",
+    "ExpectColumnValuesToBeBetween": "expect_column_values_to_be_between",
+    "ExpectColumnValueLengthsToBeBetween": "expect_column_value_lengths_to_be_between",
+    "ExpectColumnValuesToMatchRegex": "expect_column_values_to_match_regex",
+    "ExpectColumnValuesToNotMatchRegex": "expect_column_values_to_not_match_regex",
+    "ExpectColumnValuesToMatchStrftimeFormat": "expect_column_values_to_match_strftime_format",
+    "ExpectColumnValuesToBeUnique": "expect_column_values_to_be_unique",
+    "ExpectCompoundColumnsToBeUnique": "expect_compound_columns_to_be_unique",
+    "ExpectColumnMeanToBeBetween": "expect_column_mean_to_be_between",
+    "ExpectColumnMedianToBeBetween": "expect_column_median_to_be_between",
+    "ExpectColumnSumToBeBetween": "expect_column_sum_to_be_between",
+    "ExpectColumnMinToBeBetween": "expect_column_min_to_be_between",
+    "ExpectColumnMaxToBeBetween": "expect_column_max_to_be_between",
+    "ExpectColumnProportionOfUniqueValuesToBeBetween": "expect_column_proportion_of_unique_values_to_be_between",
+    "ExpectColumnValuesToBeOfType": "expect_column_values_to_be_of_type",
+    "ExpectColumnValuesToBeInTypeList": "expect_column_values_to_be_in_type_list",
+    "ExpectColumnValuesToBeDateutilParseable": "expect_column_values_to_be_dateutil_parseable",
+    "ExpectColumnValuesToMatchLikePattern": "expect_column_values_to_match_like_pattern",
+    "ExpectColumnValuesToNotMatchLikePattern": "expect_column_values_to_not_match_like_pattern",
+    "ExpectColumnValuesToBeBoolean": "expect_column_values_to_be_boolean",
+    "ExpectColumnValuesToBeNone": "expect_column_values_to_be_none",
+    "ExpectColumnValuesToNotBeNone": "expect_column_values_to_not_be_none",
+    "ExpectColumnValueLengthsToEqual": "expect_column_value_lengths_to_equal",
+    "ExpectColumnValuesToBePositive": "expect_column_values_to_be_positive",
+    "ExpectColumnValuesToBeLessThan": "expect_column_values_to_be_less_than",
+    "ExpectColumnValuesToBeGreaterThan": "expect_column_values_to_be_greater_than",
+    "ExpectColumnValuesToBeIncreasing": "expect_column_values_to_be_increasing",
+    "ExpectColumnValuesToBeDecreasing": "expect_column_values_to_be_decreasing",
+    "ExpectColumnPairValuesAToBeGreaterThanB": "expect_column_pair_values_a_to_be_greater_than_b",
+    "ExpectColumnPairValuesToBeEqual": "expect_column_pair_values_to_be_equal",
+    "ExpectTableColumnsToMatchOrderedList": "expect_table_columns_to_match_ordered_list",
+    "ExpectTableColumnCountToBeBetween": "expect_table_column_count_to_be_between",
+    "ExpectTableRowCountToEqual": "expect_table_row_count_to_equal",
+    "ExpectTableRowCountToBeBetween": "expect_table_row_count_to_be_between",
+    "ExpectTableCustomQueryToReturnNoRows": "expect_table_custom_query_to_return_no_rows",
+    "ExpectColumnToExist": "expect_column_to_exist",
+    "ExpectColumnValuesToBeValidEmail": "expect_column_values_to_be_valid_email",
+    "ExpectColumnValuesToBeValidUrl": "expect_column_values_to_be_valid_url",
+    "ExpectColumnValuesToBeValidIPv4": "expect_column_values_to_be_valid_ipv4",
+    "ExpectColumnValuesToBeValidCreditCardNumber": "expect_column_values_to_be_valid_credit_card_number",
+    "ExpectColumnValuesToBeAfter": "expect_column_values_to_be_after",
+    "ExpectColumnValuesToBeBefore": "expect_column_values_to_be_before",
+    "ExpectColumnValuesToBeBetweenDates": "expect_column_values_to_be_between_dates",
+}
+
+# Cache for loaded validators to avoid repeated imports
+_validator_cache = {}
 
 def get_validator(rule_name: str) -> Callable[[List[Dict[str, Any]], Rule], Dict[str, Any]]:
     """
-    Get the validator function for a given rule name.
+    Get the validator function for a given rule name with lazy loading.
     
     Args:
         rule_name: Name of the expectation rule
@@ -112,10 +131,26 @@ def get_validator(rule_name: str) -> Callable[[List[Dict[str, Any]], Rule], Dict
     Raises:
         ValueError: If no validator is found for the rule name
     """
-    if rule_name not in VALIDATOR_REGISTRY:
-        raise ValueError(f"No validator found for rule: {rule_name}")
+    # Check if already cached
+    if rule_name in _validator_cache:
+        return _validator_cache[rule_name]
     
-    return VALIDATOR_REGISTRY[rule_name]
+    # Handle legacy rule names
+    normalized_rule_name = LEGACY_RULE_MAPPING.get(rule_name, rule_name)
+    
+    # Check cache again with normalized name
+    if normalized_rule_name in _validator_cache:
+        _validator_cache[rule_name] = _validator_cache[normalized_rule_name]  # Cache both names
+        return _validator_cache[rule_name]
+    
+    # Load the validator function
+    try:
+        validator_func = _get_validator_function(normalized_rule_name)
+        _validator_cache[rule_name] = validator_func
+        _validator_cache[normalized_rule_name] = validator_func
+        return validator_func
+    except (ImportError, AttributeError, ValueError) as e:
+        raise ValueError(f"No validator found for rule: {rule_name}. Error: {e}")
 
 
 def get_available_validators() -> List[str]:
@@ -125,7 +160,9 @@ def get_available_validators() -> List[str]:
     Returns:
         List of available rule names
     """
-    return list(VALIDATOR_REGISTRY.keys())
+    # Return both legacy and new-style rule names
+    available = list(VALIDATOR_MAPPING.keys()) + list(LEGACY_RULE_MAPPING.keys())
+    return sorted(set(available))
 
 
 def validate_rule(data: List[Dict[str, Any]], rule: Rule) -> Dict[str, Any]:

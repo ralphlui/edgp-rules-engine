@@ -13,14 +13,12 @@ logger = logging.getLogger(__name__)
 
 # Conditional import for SQS functionality
 try:
-    from app.api.sqs_routes import router as sqs_router
     from app.sqs import start_sqs_processing, stop_sqs_processing, get_sqs_manager
     SQS_AVAILABLE = True
     logger.info("✅ SQS functionality available")
 except ImportError as e:
     logger.warning(f"⚠️ SQS functionality not available: {e}")
     SQS_AVAILABLE = False
-    sqs_router = None
 
 app = FastAPI(
     title=settings.api_title,
@@ -70,11 +68,6 @@ async def health_check():
     }
 
 app.include_router(router)
-
-# Include SQS router if available
-if SQS_AVAILABLE and sqs_router:
-    app.include_router(sqs_router)
-    logger.info("✅ SQS routes included")
 
 # Add startup and shutdown events for SQS
 @app.on_event("startup")
