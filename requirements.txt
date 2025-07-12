@@ -4,3 +4,4 @@ python-dotenv
 pydantic
 pytest
 great_expectations
+pandas

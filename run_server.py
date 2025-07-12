@@ -1,18 +1,12 @@
-from fastapi import FastAPI
-from app.api.routes import router
+#!/usr/bin/env python3
+"""
+Startup script for the EDGP Rules Engine API
+Reads configuration from .env file
+"""
+import uvicorn
 from app.core.config import settings
 
-app = FastAPI(
-    title=settings.api_title,
-    version=settings.api_version,
-    description=settings.api_description
-)
-
-app.include_router(router)
-
 if __name__ == "__main__":
-    import uvicorn
-    
     print("=" * 60)
     print(f"🚀 Starting {settings.api_title}")
     print("=" * 60)

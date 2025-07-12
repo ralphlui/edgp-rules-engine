@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.models.rule import Rule
 from app.rules.expectation_rules import get_all_expectation_rules
-from app.validator.validator import data_validator
+from app.validators.validator import data_validator
 from app.models.validation_request import ValidationRequest
 from app.models.validation_response import ValidationResponse
 
