@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test - EDGP Rules Engine</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 CORS Test - EDGP Rules Engine</h1>
+        <p>This page tests CORS functionality with the Rules Engine API running on <code>http://localhost:8008</code></p>
+        
+        <h2>Test Actions</h2>
+        <button onclick="testHealthCheck()">Test Health Check (GET)</button>
+        <button onclick="testValidation()">Test Validation (POST)</button>
+        <button onclick="testRules()">Test Get Rules (GET)</button>
+        
+        <h2>Results</h2>
+        <div id="results"></div>
+        
+        <h2>CORS Information</h2>
+        <p><strong>Expected Origin:</strong> <span id="currentOrigin"></span></p>
+        <p><strong>Server URL:</strong> http://localhost:8008</p>
+        <p><strong>CORS Status:</strong> <span id="corsStatus">Testing...</span></p>
+    </div>
+
+    <script>
+        // Display current origin
+        document.getElementById('currentOrigin').textContent = window.location.origin;
+        
+        function addResult(title, success, data) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `<strong>${title}</strong>\n${JSON.stringify(data, null, 2)}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        async function testHealthCheck() {
+            try {
+                const response = await fetch('http://localhost:8008/health', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('✅ Health Check Success', true, data);
+                    document.getElementById('corsStatus').textContent = '✅ Working';
+                } else {
+                    addResult('❌ Health Check Failed', false, { 
+                        status: response.status, 
+                        statusText: response.statusText 
+                    });
+                }
+            } catch (error) {
+                addResult('❌ Health Check Error', false, { error: error.message });
+                document.getElementById('corsStatus').textContent = '❌ CORS Blocked';
+            }
+        }
+        
+        async function testValidation() {
+            try {
+                const testData = {
+                    data: [
+                        { id: 1, name: "John", age: 25 },
+                        { id: 2, name: "Jane", age: 30 }
+                    ],
+                    rules: [
+                        {
+                            rule_name: "ExpectColumnToExist",
+                            column_name: "id"
+                        }
+                    ]
+                };
+                
+                const response = await fetch('http://localhost:8008/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('✅ Validation Success', true, data);
+                } else {
+                    const errorData = await response.text();
+                    addResult('❌ Validation Failed', false, { 
+                        status: response.status, 
+                        error: errorData 
+                    });
+                }
+            } catch (error) {
+                addResult('❌ Validation Error', false, { error: error.message });
+            }
+        }
+        
+        async function testRules() {
+            try {
+                const response = await fetch('http://localhost:8008/rules', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('✅ Get Rules Success', true, { 
+                        count: data.length, 
+                        first_few: data.slice(0, 3) 
+                    });
+                } else {
+                    addResult('❌ Get Rules Failed', false, { 
+                        status: response.status, 
+                        statusText: response.statusText 
+                    });
+                }
+            } catch (error) {
+                addResult('❌ Get Rules Error', false, { error: error.message });
+            }
+        }
+        
+        // Test CORS on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(testHealthCheck, 1000);
+        });
+    </script>
+</body>
+</html>
