@@ -11,6 +11,17 @@ from app.core.config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Conditional import for SQS functionality
+try:
+    from app.api.sqs_routes import router as sqs_router
+    from app.sqs import start_sqs_processing, stop_sqs_processing, get_sqs_manager
+    SQS_AVAILABLE = True
+    logger.info("✅ SQS functionality available")
+except ImportError as e:
+    logger.warning(f"⚠️ SQS functionality not available: {e}")
+    SQS_AVAILABLE = False
+    sqs_router = None
+
 app = FastAPI(
     title=settings.api_title,
     version=settings.api_version,
@@ -59,6 +70,50 @@ async def health_check():
     }
 
 app.include_router(router)
+
+# Include SQS router if available
+if SQS_AVAILABLE and sqs_router:
+    app.include_router(sqs_router)
+    logger.info("✅ SQS routes included")
+
+# Add startup and shutdown events for SQS
+@app.on_event("startup")
+async def startup_event():
+    """Application startup event"""
+    logger.info("🚀 Application starting up...")
+    
+    if SQS_AVAILABLE:
+        try:
+            # Check if SQS is configured and user wants auto-start
+            from app.sqs.config import SQSSettings
+            sqs_settings = SQSSettings()
+            
+            if sqs_settings.auto_start_workers:
+                logger.info("🔄 Auto-starting SQS workers...")
+                # Start SQS processing in background
+                import asyncio
+                asyncio.create_task(start_sqs_processing())
+            else:
+                logger.info("⏸️ SQS workers not auto-started (auto_start_workers=False)")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to start SQS processing: {e}")
+    
+    logger.info("✅ Application startup complete")
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    """Application shutdown event"""
+    logger.info("🛑 Application shutting down...")
+    
+    if SQS_AVAILABLE:
+        try:
+            await stop_sqs_processing()
+            logger.info("✅ SQS processing stopped")
+        except Exception as e:
+            logger.error(f"❌ Error stopping SQS processing: {e}")
+    
+    logger.info("✅ Application shutdown complete")
 
 if __name__ == "__main__":
     import uvicorn
