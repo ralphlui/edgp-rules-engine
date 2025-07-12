@@ -5,3 +5,8 @@ pydantic
 pytest
 great_expectations
 pandas
+# AWS SQS Dependencies
+boto3
+botocore
+# HTTP client for callbacks
+aiohttp
