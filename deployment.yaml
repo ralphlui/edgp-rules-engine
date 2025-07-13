@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edgp-app-rules
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: edgp-app-rules
+  template:
+    metadata:
+      labels:
+        app: edgp-app-rules
+    spec:
+      containers:
+        - name: edgp-app-rules
+          image: public.ecr.aws/q1b5w5y6/edgp-app-rules:VERSION
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8008
+          env:
+            - name: 
+              valueFrom: APP_ENV
+                configMapKeyRef:
+                  name: my-configmap
+                  key: SPRING_PROFILES_ACTIVE
+          resources:
+           requests:
+             cpu: "50m"
+             memory: "250Mi"
+           limits:
+             cpu: "350m"
+             memory: "500Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rules-k8s-service
+spec:
+  selector:
+    app: edgp-app-rules
+  ports:
+    - protocol: TCP
+      port: 8008
+      targetPort: 8008
+  type: NodePort
