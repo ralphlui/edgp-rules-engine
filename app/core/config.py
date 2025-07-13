@@ -5,7 +5,7 @@ import json
 
 class Settings(BaseSettings):
     # Server Configuration
-    host: str = "localhost"
+    host: str = "0.0.0.0"
     port: int = 8008
     
     # Environment
