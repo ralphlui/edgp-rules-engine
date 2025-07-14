@@ -15,7 +15,7 @@ router = APIRouter()
 def read_all_rules():
     return get_all_expectation_rules()
 
-@router.post("/api/validate", response_model=ValidationResponse)
+@router.post("/api/rules/validate", response_model=ValidationResponse)
 def validate_data(request: ValidationRequest) -> ValidationResponse:
     """
     Validate data using specified rules
