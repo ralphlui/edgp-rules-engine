@@ -36,7 +36,7 @@ cp .env.example .env
 
 4. Run the server:
 ```bash
-python -m app.main
+APP_ENV=PRD python -m app.main
 ```
 
 The API will be available at `http://localhost:8008`
