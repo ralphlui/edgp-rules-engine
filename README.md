@@ -13,6 +13,165 @@ The EDGP Rules Engine is a FastAPI-based microservice that provides data validat
 - **Health Monitoring**: Built-in health checks and status endpoints
 - **CLI Tools**: Command-line utilities for management and testing
 
+## SQS Data Types
+
+The EDGP Rules Engine uses standardized data types for SQS input and output queues to ensure consistent data exchange between systems.
+
+### Input Queue (SQS_INPUT_QUEUE_URL)
+
+Messages sent to the input queue should follow the `SQSValidationRequest` format:
+
+```json
+{
+  "message_id": "unique-message-id-123",
+  "correlation_id": "correlation-abc-456", 
+  "timestamp": "2025-08-01T10:30:00Z",
+  "source": "data-pipeline-system",
+  
+  "data_entry": {
+    "data_type": "tabular",
+    "data_key": "customer-data-batch-001",
+    "columns": ["name", "age", "email", "salary"],
+    "data": [
+      {"name": "John Doe", "age": 25, "email": "john@example.com", "salary": 50000},
+      {"name": "Jane Smith", "age": 30, "email": "jane@example.com", "salary": 75000}
+    ],
+    "source": "customers.csv",
+    "schema_version": "1.0"
+  },
+  
+  "validation_rules": [
+    {
+      "rule_name": "expect_column_to_exist",
+      "column_name": "name",
+      "rule_description": "Ensure name column exists"
+    },
+    {
+      "rule_name": "expect_column_values_to_be_between",
+      "column_name": "age", 
+      "value": {"min_value": 18, "max_value": 65},
+      "severity": "error"
+    },
+    {
+      "rule_name": "expect_column_values_to_match_regex",
+      "column_name": "email",
+      "value": {"regex": "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$"},
+      "severity": "warning"
+    }
+  ],
+  
+  "batch_id": "batch-2025-08-01-001",
+  "priority": 5,
+  "max_retries": 3,
+  "callback_url": "https://api.example.com/validation-results"
+}
+```
+
+#### Data Types Supported
+
+- `tabular`: Pandas DataFrame-like structured data
+- `json`: JSON object data  
+- `csv`: CSV format data
+- `parquet`: Parquet format data
+- `database`: Database query results
+
+#### Validation Rules Format
+
+Each validation rule follows the Great Expectations format:
+
+- `rule_name`: Great Expectations expectation name (e.g., `expect_column_to_exist`)
+- `column_name`: Target column for validation (optional for table-level rules)
+- `value`: Rule parameters as key-value pairs (e.g., `{"min_value": 18, "max_value": 65}`)
+- `rule_description`: Human-readable description (optional)
+- `severity`: Rule severity level - `error`, `warning`, or `info` (optional, defaults to `error`)
+
+### Output Queue (SQS_OUTPUT_QUEUE_URL)
+
+Validation results are sent to the output queue using the `SQSValidationResponse` format:
+
+```json
+{
+  "message_id": "unique-message-id-123",
+  "correlation_id": "correlation-abc-456",
+  "processed_at": "2025-08-01T10:30:15Z", 
+  "processing_time_ms": 1250,
+  
+  "status": "success",
+  "worker_id": "worker-a1b2c3d4",
+  
+  "data_key": "customer-data-batch-001",
+  "data_type": "tabular",
+  
+  "validation_results": [
+    {
+      "rule_name": "expect_column_to_exist",
+      "column_name": "name",
+      "success": true,
+      "message": "Column 'name' exists in the dataset",
+      "expected": "column_exists",
+      "actual": "column_exists",
+      "element_count": 1,
+      "unexpected_count": 0,
+      "unexpected_percent": 0.0
+    },
+    {
+      "rule_name": "expect_column_values_to_be_between", 
+      "column_name": "age",
+      "success": true,
+      "message": "100% of values are between 18 and 65",
+      "expected": {"min_value": 18, "max_value": 65},
+      "actual": {"min_found": 25, "max_found": 30},
+      "element_count": 2,
+      "unexpected_count": 0,
+      "unexpected_percent": 0.0
+    },
+    {
+      "rule_name": "expect_column_values_to_match_regex",
+      "column_name": "email", 
+      "success": true,
+      "message": "100% of email values match the expected pattern",
+      "expected": {"regex": "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$"},
+      "actual": {"valid_emails": 2, "invalid_emails": 0},
+      "element_count": 2,
+      "unexpected_count": 0, 
+      "unexpected_percent": 0.0
+    }
+  ],
+  
+  "summary": {
+    "total_rules": 3,
+    "successful_rules": 3,
+    "failed_rules": 0,
+    "success_rate": 1.0,
+    "total_rows": 2,
+    "total_columns": 4,
+    "execution_time_ms": 1250,
+    "validation_engine": "great_expectations"
+  },
+  
+  "batch_id": "batch-2025-08-01-001",
+  "source": "data-pipeline-system",
+  "schema_version": "1.0"
+}
+```
+
+#### Status Values
+
+- `pending`: Message received but not yet processed
+- `processing`: Currently being processed by a worker
+- `success`: Validation completed successfully
+- `failed`: Processing failed due to an error
+- `retry`: Processing failed but will be retried
+- `dlq`: Sent to dead letter queue after max retries
+
+### Legacy Support
+
+The system maintains backward compatibility with older message formats:
+
+- `data` field: Legacy array of data rows (use `data_entry.data` instead)
+- `rules` field: Legacy rules array (use `validation_rules` instead)  
+- Legacy response fields: `total_rules`, `successful_rules`, `failed_rules` (use `summary` object instead)
+
 ## Quick Start
 
 ### Installation
@@ -611,6 +770,195 @@ Set up monitoring for:
 - Error rates
 - Worker health
 - AWS SQS metrics (CloudWatch)
+
+# SQS Environment Configuration Migration
+
+## Overview
+
+All SQS configurations have been successfully migrated to environment-specific files (`.env`, `.env.development`, and `.env.production`) with automatic selection based on the `APP_ENV` variable.
+
+## Migration Summary
+
+### ✅ Completed Tasks
+
+1. **Environment Files Updated**
+   - ✅ `.env` - Enhanced with comprehensive SQS configuration
+   - ✅ `.env.development` - Added SQS settings optimized for development/SIT
+   - ✅ `.env.production` - Added SQS settings optimized for production/PRD
+
+2. **SQS Config Class Updated**
+   - ✅ Updated to use `pydantic_settings.BaseSettings`
+   - ✅ Integrated with dynamic environment file selection
+   - ✅ Maintained backward compatibility with legacy settings
+   - ✅ Made `input_queue_url` optional to handle missing configurations gracefully
+
+3. **Dynamic Environment Selection**
+   - ✅ SQS config now uses the same environment file mapping as main config
+   - ✅ `APP_ENV=SIT` → loads SQS settings from `.env.development`
+   - ✅ `APP_ENV=PRD` → loads SQS settings from `.env.production`
+
+## Environment-Specific Configurations
+
+### Development Environment (SIT)
+**File**: `.env.development`
+
+Key differences for development:
+- **Lower resource usage**: `SQS_WORKER_COUNT=2` (vs 8 in production)
+- **Conservative polling**: `SQS_MAX_MESSAGES_PER_POLL=5` (vs 10 in production)
+- **Manual worker start**: `SQS_AUTO_START_WORKERS=false`
+- **Development queues**: Uses `dev-*` prefixed queue names
+- **Slower polling**: `SQS_POLL_INTERVAL=10` (vs 5 in production)
+
+### Production Environment (PRD)
+**File**: `.env.production`
+
+Key differences for production:
+- **Higher performance**: `SQS_WORKER_COUNT=8`
+- **Maximum throughput**: `SQS_MAX_MESSAGES_PER_POLL=10`
+- **Auto-start workers**: `SQS_AUTO_START_WORKERS=true`
+- **Production queues**: Uses `prod-*` prefixed queue names
+- **Fast polling**: `SQS_POLL_INTERVAL=5`
+- **More retries**: `SQS_MAX_RETRIES=5` (vs 3 in development)
+- **Longer processing timeout**: `SQS_PROCESSING_TIMEOUT=180` (vs 120)
+- **Faster health checks**: `SQS_HEALTH_CHECK_INTERVAL=30` (vs 60)
+
+### Local Development
+**File**: `.env`
+
+Balanced settings for local development with example configurations.
+
+## Configuration Categories
+
+### 1. AWS Credentials
+```bash
+# All environments include:
+SQS_AWS_ACCESS_KEY_ID=***
+SQS_AWS_SECRET_ACCESS_KEY=***
+SQS_AWS_REGION=us-east-1
+SQS_AWS_SESSION_TOKEN=  # Optional
+```
+
+### 2. Queue Configuration
+```bash
+# Environment-specific queue URLs:
+# Development: dev-validation-*-queue
+# Production:  prod-validation-*-queue
+SQS_INPUT_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/{env}-validation-input-queue
+SQS_OUTPUT_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/{env}-validation-output-queue
+SQS_DLQ_URL=https://sqs.us-east-1.amazonaws.com/123456789012/{env}-validation-dlq
+```
+
+### 3. Processing Configuration
+```bash
+# Optimized per environment:
+SQS_MAX_MESSAGES_PER_POLL=5|10     # Dev: 5, Prod: 10
+SQS_VISIBILITY_TIMEOUT=300
+SQS_WAIT_TIME_SECONDS=20
+SQS_POLL_INTERVAL=10|5             # Dev: 10, Prod: 5
+```
+
+### 4. Worker Configuration
+```bash
+# Scaled per environment:
+SQS_WORKER_COUNT=2|8               # Dev: 2, Prod: 8
+SQS_AUTO_START_WORKERS=false|true  # Dev: false, Prod: true
+SQS_MAX_RETRIES=3|5                # Dev: 3, Prod: 5
+```
+
+### 5. Processing Limits
+```bash
+# Performance tuned:
+SQS_PROCESSING_TIMEOUT=120|180     # Dev: 120s, Prod: 180s
+SQS_BATCH_PROCESSING=true
+```
+
+### 6. Health Monitoring
+```bash
+# Monitoring frequency:
+SQS_HEALTH_CHECK_INTERVAL=60|30    # Dev: 60s, Prod: 30s
+```
+
+## Usage Examples
+
+### Kubernetes Deployment
+```yaml
+# In deployment.yaml
+env:
+  - name: APP_ENV
+    valueFrom:
+      configMapKeyRef:
+        name: my-configmap
+        key: SPRING_PROFILES_ACTIVE  # Set to "SIT" or "PRD"
+```
+
+### Local Testing
+```bash
+# Test SIT environment
+APP_ENV=SIT python -m app.main
+
+# Test PRD environment  
+APP_ENV=PRD python -m app.main
+
+# Local development (no APP_ENV set)
+python -m app.main
+```
+
+## Key Benefits
+
+1. **Environment Isolation**: Clear separation between dev and prod SQS resources
+2. **Performance Optimization**: Each environment tuned for its use case
+3. **Resource Management**: Development uses fewer workers, production maximizes throughput
+4. **Security**: Separate AWS credentials and queue URLs per environment
+5. **Automatic Selection**: No manual configuration needed - works with existing deployment
+6. **Backward Compatibility**: Legacy configuration keys still supported
+
+## Configuration Validation
+
+The SQS configuration includes:
+- **Field validation**: Ensures values are within acceptable ranges
+- **Legacy support**: Automatically maps old configuration keys to new ones
+- **Optional fields**: Gracefully handles missing configurations
+- **Type safety**: Pydantic validates all configuration types
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing Configuration**: If SQS settings aren't found, check:
+   - APP_ENV is set correctly
+   - Environment file exists and has SQS_ prefixed variables
+
+2. **Wrong Environment**: If wrong settings are loaded:
+   - Verify APP_ENV value: `echo $APP_ENV`
+   - Check environment file selection in startup logs
+
+3. **Queue Access Issues**: Ensure:
+   - AWS credentials are valid for the environment
+   - Queue URLs match the actual AWS queues
+   - IAM permissions are set correctly
+
+### Verification
+
+Check which environment file is being used:
+```
+🌍 Using environment file: .env.production (APP_ENV=PRD)
+```
+
+## Security Considerations
+
+1. **Credential Management**: Use different AWS credentials for each environment
+2. **Queue Separation**: Ensure dev and prod queues are completely separate
+3. **Access Control**: Restrict production queue access appropriately
+4. **Monitoring**: Set up appropriate CloudWatch alarms for production queues
+
+## Next Steps
+
+1. **Update Deployment Scripts**: Ensure deployment scripts set APP_ENV correctly
+2. **AWS Queue Setup**: Create environment-specific SQS queues matching the URLs
+3. **Credential Management**: Set up proper AWS credentials for each environment
+4. **Monitoring**: Configure CloudWatch monitoring for SQS queues
+5. **Testing**: Validate end-to-end SQS functionality in each environment
+
 
 ## Contributing
 

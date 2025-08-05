@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError, BotoCoreError
 from datetime import datetime
 
 from .config import SQSSettings
-from ..models.sqs_models import SQSMessageWrapper, SQSValidationRequest
+from ..models.validation import SQSMessageWrapper, SQSValidationRequest
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class SQSClient:
                 QueueUrl=queue_url,
                 MaxNumberOfMessages=self.settings.max_messages_per_poll,
                 WaitTimeSeconds=self.settings.wait_time_seconds,
-                VisibilityTimeoutSeconds=self.settings.visibility_timeout,
+                VisibilityTimeout=self.settings.visibility_timeout,
                 AttributeNames=['All'],
                 MessageAttributeNames=['All']
             )

@@ -4,8 +4,20 @@ import logging
 from app.models.rule import Rule
 from app.rules.expectation_rules import get_all_expectation_rules
 from app.validators.validator import data_validator
-from app.models.validation_request import ValidationRequest
-from app.models.validation_response import ValidationResponse, ValidationResult, ValidationSummary
+
+# Import unified validation models
+from app.models.validation import (
+    ValidationRequest, 
+    ValidationResponse, 
+    ValidationRule,
+    ValidationResultDetail, 
+    ValidationSummary,
+    SQSValidationRequest,
+    SQSValidationResponse,
+    DataEntry,
+    DataType,
+    convert_legacy_rule
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +49,15 @@ def validate_data(request: ValidationRequest) -> ValidationResponse:
         
         # Process validation using existing validator
         results = []
-        summary = {"total_rules": len(rules), "passed": 0, "failed": 0}
+        summary_data = {
+            "total_rules": len(rules), 
+            "successful_rules": 0, 
+            "failed_rules": 0,
+            "success_rate": 0.0,
+            "total_rows": len(data),
+            "total_columns": len(data[0].keys()) if data and len(data) > 0 else 0,
+            "execution_time_ms": 0
+        }
         
         for rule in rules:
             try:
@@ -53,33 +73,45 @@ def validate_data(request: ValidationRequest) -> ValidationResponse:
                 validator_instance = validator_class()
                 result = validator_instance.validate(data, column_name, **value)
                 
-                results.append(ValidationResult(
-                    rule=rule_name,
-                    column=column_name,
+                results.append(ValidationResultDetail(
+                    rule_name=rule_name,
+                    column_name=column_name,
                     success=result.get("success", False),
                     message=result.get("message", ""),
-                    details=result.get("details", {})
+                    details=result.get("details", {}),
+                    # Legacy compatibility
+                    rule=rule_name,
+                    column=column_name
                 ))
                 
                 if result.get("success", False):
-                    summary["passed"] += 1
+                    summary_data["successful_rules"] += 1
                 else:
-                    summary["failed"] += 1
+                    summary_data["failed_rules"] += 1
                     
             except Exception as e:
                 logger.error(f"Error validating rule {rule.rule_name}: {e}")
-                results.append(ValidationResult(
-                    rule=rule.rule_name,
-                    column=rule.column_name or "",
+                results.append(ValidationResultDetail(
+                    rule_name=rule.rule_name,
+                    column_name=rule.column_name or "",
                     success=False,
                     message=f"Validation error: {str(e)}",
-                    details={}
+                    details={},
+                    # Legacy compatibility
+                    rule=rule.rule_name,
+                    column=rule.column_name or ""
                 ))
-                summary["failed"] += 1
+                summary_data["failed_rules"] += 1
+        
+        # Calculate success rate
+        summary_data["success_rate"] = (
+            summary_data["successful_rules"] / summary_data["total_rules"] 
+            if summary_data["total_rules"] > 0 else 0.0
+        )
         
         return ValidationResponse(
             results=results,
-            summary=ValidationSummary(**summary)
+            summary=ValidationSummary(**summary_data)
         )
         
     except HTTPException:
@@ -190,12 +222,12 @@ if SQS_AVAILABLE:
             raise HTTPException(status_code=500, detail="Failed to get queue statistics")
 
     @router.post("/sqs/send-message")
-    async def send_test_message(
+    async def send_validation_message(
         validation_request: SQSValidationRequest,
         queue_url: Optional[str] = None
     ):
         """
-        Send a test validation message to SQS queue
+        Send a validation message to SQS queue
         
         Args:
             validation_request: Validation request to send
@@ -216,16 +248,109 @@ if SQS_AVAILABLE:
                 raise HTTPException(status_code=500, detail="Failed to send message")
             
             return {
-                "message": "Message sent successfully",
+                "message": "Validation message sent successfully",
                 "message_id": message_id,
-                "queue": queue_url or "input_queue"
+                "queue": queue_url or manager.settings.input_queue_url,
+                "request_id": validation_request.message_id
             }
             
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Failed to send message: {e}")
+            logger.error(f"Failed to send validation message: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
+
+    @router.post("/sqs/send-test-message")
+    async def send_test_message(
+        queue_url: Optional[str] = None
+    ):
+        """
+        Send a test validation message to SQS queue for testing purposes
+        
+        Args:
+            queue_url: Optional queue URL (defaults to input queue)
+            
+        Returns:
+            Message ID and details if successful
+        """
+        try:
+            from datetime import datetime
+            from app.models.sqs_models import DataEntry, ValidationRule
+            
+            # Create a test message
+            test_data_entry = DataEntry(
+                data_type="tabular",
+                data_key=f"test-dataset-{int(datetime.now().timestamp())}",
+                columns=["name", "age", "email", "salary"],
+                data=[
+                    {"name": "John Doe", "age": 25, "email": "john@example.com", "salary": 50000},
+                    {"name": "Jane Smith", "age": 30, "email": "jane@example.com", "salary": 75000},
+                    {"name": "Bob Johnson", "age": 35, "email": "bob@example.com", "salary": 60000},
+                    {"name": "Alice Brown", "age": 28, "email": "alice@example.com", "salary": 55000}
+                ],
+                source="fastapi_test",
+                schema_version="1.0"
+            )
+            
+            test_rules = [
+                ValidationRule(
+                    rule_name="expect_column_to_exist",
+                    column_name="name",
+                    rule_description="Ensure name column exists",
+                    severity="error"
+                ),
+                ValidationRule(
+                    rule_name="expect_column_values_to_be_between",
+                    column_name="age",
+                    value={"min_value": 18, "max_value": 65},
+                    rule_description="Age should be between 18 and 65",
+                    severity="error"
+                ),
+                ValidationRule(
+                    rule_name="expect_column_values_to_be_between",
+                    column_name="salary",
+                    value={"min_value": 30000, "max_value": 100000},
+                    rule_description="Salary should be between 30K and 100K",
+                    severity="warning"
+                )
+            ]
+            
+            test_request = SQSValidationRequest(
+                message_id=f"api-test-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                correlation_id=f"api-corr-{datetime.now().timestamp()}",
+                timestamp=datetime.now().isoformat(),
+                source="fastapi_api",
+                data_entry=test_data_entry,
+                validation_rules=test_rules,
+                batch_id=f"api-batch-{datetime.now().strftime('%Y%m%d')}",
+                priority=5,
+                max_retries=3
+            )
+            
+            manager = get_sqs_manager()
+            
+            message_id = manager.sqs_client.send_message(
+                test_request.dict(),
+                queue_url=queue_url
+            )
+            
+            if not message_id:
+                raise HTTPException(status_code=500, detail="Failed to send test message")
+            
+            return {
+                "message": "Test validation message sent successfully",
+                "message_id": message_id,
+                "queue": queue_url or manager.settings.input_queue_url,
+                "test_request_id": test_request.message_id,
+                "data_rows": len(test_data_entry.data),
+                "validation_rules": len(test_rules)
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to send test message: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to send test message: {str(e)}")
 
     @router.get("/sqs/worker-stats")
     async def get_worker_stats() -> Dict[str, Any]:
