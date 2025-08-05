@@ -10,14 +10,19 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..api.routes import validate_data as api_validate_data
+from ..models.validation import ValidationRequest
+from ..models.sqs_models import (
+    SQSValidationRequest,
+    SQSValidationResponse,
+    SQSMessageWrapper,
+    ProcessingResult,
+    MessageStatus,
+    ValidationResultDetail,
+    ValidationSummary,
+    DataType
+)
 from .config import SQSSettings
 from .client import SQSClient
-from ..models.sqs_models import (
-    SQSMessageWrapper, 
-    SQSValidationResponse, 
-    ProcessingResult, 
-    MessageStatus
-)
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +52,32 @@ class MessageProcessor:
         try:
             logger.info(f"Processing message {message.body.message_id} (worker: {self.worker_id})")
             
-            # Prepare validation request
-            validation_request = {
-                "data": message.body.data,
-                "rules": [rule.dict() for rule in message.body.rules]
-            }
+            # Use unified message methods to get data
+            dataset = message.body.get_dataset()
+            data_key = message.body.get_data_key()
+            data_type = message.body.get_data_type()
+            
+            # Create proper ValidationRequest object using unified model
+            validation_request = ValidationRequest(
+                dataset=dataset,
+                rules=message.body.validation_rules,
+                data_key=data_key,
+                data_type=data_type
+            )
             
             # Call validation API (reuse existing logic)
             validation_response = api_validate_data(validation_request)
             
             # Calculate processing time
             processing_time = int((time.time() - start_time) * 1000)
+            
+            # The API now returns ValidationResponse with unified models
+            # Extract results and summary
+            detailed_results = validation_response.results
+            enhanced_summary = validation_response.summary
+            
+            # Update summary with processing time
+            enhanced_summary.execution_time_ms = processing_time
             
             # Create response
             sqs_response = SQSValidationResponse(
@@ -66,11 +86,17 @@ class MessageProcessor:
                 processing_time_ms=processing_time,
                 status=MessageStatus.SUCCESS,
                 worker_id=self.worker_id,
-                validation_results=validation_response.get("results", []),
-                summary=validation_response.get("summary", {}),
-                total_rules=len(message.body.rules),
-                successful_rules=sum(1 for r in validation_response.get("results", []) if r.get("success", False)),
-                failed_rules=sum(1 for r in validation_response.get("results", []) if not r.get("success", True))
+                data_key=data_key,
+                data_type=data_type,
+                validation_results=detailed_results,
+                summary=enhanced_summary,
+                batch_id=getattr(message.body, 'batch_id', None),
+                source=getattr(message.body, 'source', None),
+                
+                # Legacy compatibility fields
+                total_rules=enhanced_summary.total_rules,
+                successful_rules=enhanced_summary.successful_rules,
+                failed_rules=enhanced_summary.failed_rules
             )
             
             # Always send response to output queue (required for SQS workflow)
@@ -102,6 +128,30 @@ class MessageProcessor:
                 not self._is_permanent_error(e)
             )
             
+            # Get data information for error response
+            if hasattr(message.body, 'data_entry') and message.body.data_entry:
+                error_data_key = message.body.data_entry.data_key
+                error_data_type = message.body.data_entry.data_type
+                error_data_rows = len(message.body.data_entry.data) if message.body.data_entry.data else 0
+                error_data_cols = len(message.body.data_entry.columns) if message.body.data_entry.columns else 0
+            else:
+                error_data_key = f"legacy-{message.body.message_id}"
+                error_data_type = DataType.TABULAR
+                error_data_rows = len(message.body.data) if message.body.data else 0
+                error_data_cols = len(message.body.data[0].keys()) if message.body.data and len(message.body.data) > 0 else 0
+            
+            # Create error summary
+            error_summary = ValidationSummary(
+                total_rules=len(getattr(message.body, 'validation_rules', []) or getattr(message.body, 'rules', [])),
+                successful_rules=0,
+                failed_rules=0,
+                success_rate=0.0,
+                total_rows=error_data_rows,
+                total_columns=error_data_cols,
+                execution_time_ms=processing_time,
+                validation_engine="great_expectations"
+            )
+            
             # Create error response
             error_response = SQSValidationResponse(
                 message_id=message.body.message_id,
@@ -109,8 +159,18 @@ class MessageProcessor:
                 processing_time_ms=processing_time,
                 status=MessageStatus.RETRY if should_retry else MessageStatus.FAILED,
                 worker_id=self.worker_id,
+                data_key=error_data_key,
+                data_type=error_data_type,
+                summary=error_summary,
                 error_message=str(e),
-                error_code=type(e).__name__
+                error_code=type(e).__name__,
+                batch_id=getattr(message.body, 'batch_id', None),
+                source=getattr(message.body, 'source', None),
+                
+                # Legacy compatibility fields
+                total_rules=error_summary.total_rules,
+                successful_rules=error_summary.successful_rules,
+                failed_rules=error_summary.failed_rules
             )
             
             # Send error response to output queue for tracking
@@ -160,7 +220,7 @@ class MessageProcessor:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     callback_url,
-                    json=response.dict(),
+                    json=response.model_dump(),
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as resp:
                     if resp.status == 200:
@@ -185,7 +245,7 @@ class MessageProcessor:
             # Always try to send to output queue if configured
             if self.settings.output_queue_url:
                 message_id = self.sqs_client.send_message(
-                    response.dict(),
+                    response.model_dump(),
                     queue_url=self.settings.output_queue_url
                 )
                 

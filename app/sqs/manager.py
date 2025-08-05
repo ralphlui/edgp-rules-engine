@@ -39,7 +39,7 @@ class SQSManager:
             return
         
         logger.info(f"Starting SQS Manager with {self.settings.worker_count} workers")
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now()
         self.is_running = True
         
         # Create and start workers
@@ -97,7 +97,7 @@ class SQSManager:
         
         uptime = None
         if self.start_time:
-            uptime = (datetime.utcnow() - self.start_time).total_seconds()
+            uptime = (datetime.now() - self.start_time).total_seconds()
         
         return {
             "is_running": self.is_running,
@@ -144,7 +144,7 @@ class SQSManager:
         
         return {
             "healthy": overall_healthy,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "sqs": sqs_health,
             "workers": worker_health,
             "manager_running": self.is_running

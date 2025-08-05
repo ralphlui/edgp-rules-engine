@@ -1,9 +1,51 @@
 """
 SQS Configuration settings for AWS integration.
 """
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field, ConfigDict
 from typing import Optional
 import os
+from pathlib import Path
+
+def get_sqs_env_file_path() -> str:
+    """
+    Get the same environment file path as the main config.
+    This ensures SQS config uses the same environment file selection logic.
+    """
+    app_env = os.getenv("APP_ENV", "").upper()
+    
+    # Get the project root directory (where .env files are located)
+    project_root = Path(__file__).parent.parent.parent
+    
+    # Environment mapping (same as main config)
+    env_mapping = {
+        "SIT": ".env.development",
+        "DEV": ".env.development", 
+        "DEVELOPMENT": ".env.development",
+        "PRD": ".env.production",
+        "PROD": ".env.production",
+        "PRODUCTION": ".env.production"
+    }
+    
+    if app_env in env_mapping:
+        env_file = project_root / env_mapping[app_env]
+        if env_file.exists():
+            return str(env_file)
+    
+    # Fallback logic - only use .env if no specific environment was requested
+    if not app_env:
+        fallback_files = [".env", ".env.development"]
+    else:
+        fallback_files = [".env.development"]
+        
+    for fallback in fallback_files:
+        fallback_path = project_root / fallback
+        if fallback_path.exists():
+            return str(fallback_path)
+    
+    # If no env files exist, return default path
+    default_path = project_root / ".env"
+    return str(default_path)
 
 class SQSSettings(BaseSettings):
     """SQS-specific configuration settings"""
@@ -15,7 +57,7 @@ class SQSSettings(BaseSettings):
     aws_session_token: Optional[str] = Field(default=None, description="AWS Session Token for temporary credentials")
     
     # SQS Queue Configuration
-    input_queue_url: str = Field(..., description="Input SQS Queue URL for validation requests")
+    input_queue_url: Optional[str] = Field(default=None, description="Input SQS Queue URL for validation requests")
     output_queue_url: Optional[str] = Field(default=None, description="Output SQS Queue URL for validation results")
     dlq_url: Optional[str] = Field(default=None, description="Dead Letter Queue URL for failed messages")
     
@@ -43,12 +85,14 @@ class SQSSettings(BaseSettings):
     # Health Check
     health_check_interval: int = Field(default=60, ge=10, description="Health check interval in seconds")
     
-    class Config:
-        env_file = ".env"
-        env_prefix = "SQS_"
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=get_sqs_env_file_path(),
+        env_prefix="SQS_",
+        case_sensitive=False,
+        extra="ignore"
+    )
     
-    def __post_init__(self):
+    def model_post_init(self, __context) -> None:
         """Handle backward compatibility and validation"""
         # Handle legacy queue URL
         if not self.input_queue_url and self.sqs_queue_url:
