@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError, BotoCoreError
 from datetime import datetime
 
 from .config import SQSSettings
-from ..models.validation import SQSMessageWrapper, SQSValidationRequest
+from ..models.sqs_models import SQSMessageWrapper, SQSValidationRequest
 
 logger = logging.getLogger(__name__)
 

@@ -10,8 +10,8 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..api.routes import validate_data as api_validate_data
-from ..models.validation import (
-    ValidationRequest,
+from ..models.validation import ValidationRequest
+from ..models.sqs_models import (
     SQSValidationRequest,
     SQSValidationResponse,
     SQSMessageWrapper,
@@ -19,8 +19,7 @@ from ..models.validation import (
     MessageStatus,
     ValidationResultDetail,
     ValidationSummary,
-    DataType,
-    convert_legacy_validation_request
+    DataType
 )
 from .config import SQSSettings
 from .client import SQSClient
@@ -221,7 +220,7 @@ class MessageProcessor:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     callback_url,
-                    json=response.dict(),
+                    json=response.model_dump(),
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as resp:
                     if resp.status == 200:
@@ -246,7 +245,7 @@ class MessageProcessor:
             # Always try to send to output queue if configured
             if self.settings.output_queue_url:
                 message_id = self.sqs_client.send_message(
-                    response.dict(),
+                    response.model_dump(),
                     queue_url=self.settings.output_queue_url
                 )
                 

@@ -12,11 +12,14 @@ from app.models.validation import (
     ValidationRule,
     ValidationResultDetail, 
     ValidationSummary,
-    SQSValidationRequest,
-    SQSValidationResponse,
     DataEntry,
-    DataType,
-    convert_legacy_rule
+    DataType
+)
+
+# Import SQS models from their own module
+from app.models.sqs_models import (
+    SQSValidationRequest,
+    SQSValidationResponse
 )
 
 logger = logging.getLogger(__name__)
