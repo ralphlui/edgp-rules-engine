@@ -21,16 +21,13 @@ class SQSManager:
         self.sqs_client = SQSClient(self.settings)
         self.workers: List[MessageProcessor] = []
         self.is_running = False
+        self.is_shutting_down = False
         self.start_time: Optional[datetime] = None
+        self.worker_tasks: List[asyncio.Task] = []
         
-        # Setup signal handlers for graceful shutdown
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGINT, self._signal_handler)
-    
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals"""
-        logger.info(f"Received signal {signum}, shutting down...")
-        asyncio.create_task(self.stop())
+        # Remove signal handlers - let the main app handle signals
+        # signal.signal(signal.SIGTERM, self._signal_handler)
+        # signal.signal(signal.SIGINT, self._signal_handler)
     
     async def start(self):
         """Start the SQS manager with workers"""
@@ -43,20 +40,20 @@ class SQSManager:
         self.is_running = True
         
         # Create and start workers
-        tasks = []
+        self.worker_tasks = []
         for i in range(self.settings.worker_count):
             worker = MessageProcessor(self.settings, self.sqs_client)
             self.workers.append(worker)
             
             # Start worker as async task
             task = asyncio.create_task(worker.run_worker_loop())
-            tasks.append(task)
+            self.worker_tasks.append(task)
         
         logger.info(f"All {len(self.workers)} workers started successfully")
         
         # Wait for all workers to complete
         try:
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*self.worker_tasks)
         except asyncio.CancelledError:
             logger.info("All workers cancelled")
         except Exception as e:
@@ -71,15 +68,24 @@ class SQSManager:
             return
         
         logger.info("Stopping SQS Manager...")
+        self.is_shutting_down = True
         self.is_running = False
         
         # Stop all workers
         for worker in self.workers:
             worker.stop()
         
-        # Give workers time to finish current messages
-        logger.info("Waiting for workers to finish current messages...")
-        await asyncio.sleep(2)
+        # Cancel all worker tasks
+        for task in self.worker_tasks:
+            if not task.done():
+                task.cancel()
+        
+        # Wait for tasks to be cancelled
+        if self.worker_tasks:
+            try:
+                await asyncio.gather(*self.worker_tasks, return_exceptions=True)
+            except Exception as e:
+                logger.error(f"Error cancelling worker tasks: {e}")
         
         logger.info("SQS Manager stopped successfully")
     

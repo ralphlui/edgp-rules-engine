@@ -68,7 +68,7 @@ class SQSSettings(BaseSettings):
     # Processing Configuration
     max_messages_per_poll: int = Field(default=10, ge=1, le=10, description="Maximum messages to retrieve per poll (1-10)")
     visibility_timeout: int = Field(default=300, ge=0, description="Message visibility timeout in seconds")
-    wait_time_seconds: int = Field(default=20, ge=0, le=20, description="Long polling wait time (0-20 seconds)")
+    wait_time_seconds: int = Field(default=5, ge=0, le=20, description="Long polling wait time (0-20 seconds)")
     poll_interval: int = Field(default=5, ge=1, description="Polling interval when no messages available")
     max_retry_delay: int = Field(default=300, ge=0, description="Maximum retry delay in seconds")
     

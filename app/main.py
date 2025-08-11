@@ -69,10 +69,14 @@ async def health_check():
 
 app.include_router(router)
 
+# Global variable to track SQS task
+_sqs_task = None
+
 # Add startup and shutdown events for SQS
 @app.on_event("startup")
 async def startup_event():
     """Application startup event"""
+    global _sqs_task
     logger.info("🚀 Application starting up...")
     
     if SQS_AVAILABLE:
@@ -83,9 +87,9 @@ async def startup_event():
             
             if sqs_settings.auto_start_workers:
                 logger.info("🔄 Auto-starting SQS workers...")
-                # Start SQS processing in background
+                # Start SQS processing in background but track the task
                 import asyncio
-                asyncio.create_task(start_sqs_processing())
+                _sqs_task = asyncio.create_task(start_sqs_processing())
             else:
                 logger.info("⏸️ SQS workers not auto-started (auto_start_workers=False)")
                 
@@ -94,13 +98,25 @@ async def startup_event():
     
     logger.info("✅ Application startup complete")
 
-@app.on_event("shutdown") 
+@app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown event"""
+    global _sqs_task
     logger.info("🛑 Application shutting down...")
     
     if SQS_AVAILABLE:
         try:
+            # Cancel the SQS task first
+            import asyncio
+            if _sqs_task and not _sqs_task.done():
+                logger.info("🛑 Cancelling SQS task...")
+                _sqs_task.cancel()
+                try:
+                    await _sqs_task
+                except asyncio.CancelledError:
+                    logger.info("✅ SQS task cancelled")
+            
+            # Stop SQS processing
             await stop_sqs_processing()
             logger.info("✅ SQS processing stopped")
         except Exception as e:
@@ -110,6 +126,16 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
+    import signal
+    import sys
+    
+    def signal_handler(sig, frame):
+        """Handle Ctrl+C gracefully"""
+        print("\n🛑 Received shutdown signal, stopping server...")
+        sys.exit(0)
+    
+    # Register signal handler for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
     
     print("=" * 60)
     print(f"🚀 Starting {settings.api_title}")
@@ -128,6 +154,8 @@ if __name__ == "__main__":
         "app.main:app",
         host=settings.host,
         port=settings.port,
-        reload=True,
-        log_level="info"
+        reload=False,  # Disable reload for better shutdown behavior
+        log_level="info",
+        access_log=True,
+        use_colors=True
     )

@@ -4,6 +4,7 @@ import logging
 from app.models.rule import Rule
 from app.rules.expectation_rules import get_all_expectation_rules
 from app.validators.validator import data_validator
+from app.validators.validator_registry import get_validator
 
 # Import unified validation models
 from app.models.validation import (
@@ -16,11 +17,11 @@ from app.models.validation import (
     DataType
 )
 
-# Import SQS models from their own module
-from app.models.sqs_models import (
-    SQSValidationRequest,
-    SQSValidationResponse
-)
+# SQS models temporarily disabled during format update
+# from app.models.sqs_models import (
+#     SQSValidationRequest,
+#     SQSValidationResponse
+# )
 
 logger = logging.getLogger(__name__)
 
@@ -68,13 +69,11 @@ def validate_data(request: ValidationRequest) -> ValidationResponse:
                 column_name = rule.column_name
                 value = rule.value or {}
                 
-                # Import the appropriate validator based on rule name
-                validator_module = __import__(f"app.validators.{rule_name}", fromlist=[rule_name])
-                validator_class = getattr(validator_module, rule_name.replace("_", " ").title().replace(" ", ""))
+                # Get validator function from registry
+                validator_func = get_validator(rule_name)
                 
-                # Create validator instance and validate
-                validator_instance = validator_class()
-                result = validator_instance.validate(data, column_name, **value)
+                # Call validator function directly
+                result = validator_func(data, rule)
                 
                 results.append(ValidationResultDetail(
                     rule_name=rule_name,
@@ -123,14 +122,15 @@ def validate_data(request: ValidationRequest) -> ValidationResponse:
         logger.error(f"Validation request failed: {e}")
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
 
-# SQS Routes - conditionally imported
-try:
-    from ..sqs import get_sqs_manager, start_sqs_processing, stop_sqs_processing
-    from ..models.sqs_models import SQSValidationRequest
-    SQS_AVAILABLE = True
-except ImportError:
-    SQS_AVAILABLE = False
-    logger.warning("SQS functionality not available - SQS routes will not be registered")
+# SQS Routes - temporarily disabled during format update
+# try:
+#     from ..sqs import get_sqs_manager, start_sqs_processing, stop_sqs_processing
+#     from ..models.sqs_models import SQSValidationRequest
+#     SQS_AVAILABLE = True
+# except ImportError:
+#     SQS_AVAILABLE = False
+#     logger.warning("SQS functionality not available - SQS routes will not be registered")
+SQS_AVAILABLE = False
 
 # SQS Management Routes
 if SQS_AVAILABLE:

@@ -84,7 +84,10 @@ class SQSClient:
                     # Optionally send to DLQ
                     continue
             
-            logger.info(f"Received {len(wrapped_messages)} messages from queue")
+            if wrapped_messages:
+                logger.info(f"Received {len(wrapped_messages)} messages from queue")
+            else:
+                logger.debug(f"Received 0 messages from queue")
             return wrapped_messages
             
         except ClientError as e:
