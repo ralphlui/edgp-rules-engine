@@ -19,7 +19,10 @@ from ..models.sqs_models import (
     MessageStatus,
     ValidationResultDetail,
     ValidationSummary,
-    DataType
+    DataType,
+    get_dataset_from_request,
+    get_validation_rules_from_request,
+    create_response_from_request_and_results
 )
 from .config import SQSSettings
 from .client import SQSClient
@@ -50,19 +53,31 @@ class MessageProcessor:
         start_time = time.time()
         
         try:
-            logger.info(f"Processing message {message.body.message_id} (worker: {self.worker_id})")
+            logger.info(f"Processing message {message.message_id} (worker: {self.worker_id})")
             
-            # Use unified message methods to get data
-            dataset = message.body.get_dataset()
-            data_key = message.body.get_data_key()
-            data_type = message.body.get_data_type()
+            # Extract data and rules using helper functions
+            dataset = get_dataset_from_request(message.body)
+            validation_rules = get_validation_rules_from_request(message.body)
+            
+            # Get file and policy IDs from data_entry
+            file_id = message.body.data_entry.file_id
+            policy_id = message.body.data_entry.policy_id
+            data_type = message.body.data_entry.data_type
+            
+            # Convert SQS ValidationRule objects to the format expected by the API
+            api_rules = []
+            for rule in validation_rules:
+                api_rule = {
+                    "rule_name": rule.rule_name,
+                    "column_name": rule.column_name,
+                    "value": rule.value
+                }
+                api_rules.append(api_rule)
             
             # Create proper ValidationRequest object using unified model
             validation_request = ValidationRequest(
                 dataset=dataset,
-                rules=message.body.validation_rules,
-                data_key=data_key,
-                data_type=data_type
+                rules=api_rules
             )
             
             # Call validation API (reuse existing logic)
@@ -79,38 +94,23 @@ class MessageProcessor:
             # Update summary with processing time
             enhanced_summary.execution_time_ms = processing_time
             
-            # Create response
-            sqs_response = SQSValidationResponse(
-                message_id=message.body.message_id,
-                correlation_id=message.body.correlation_id,
-                processing_time_ms=processing_time,
-                status=MessageStatus.SUCCESS,
-                worker_id=self.worker_id,
-                data_key=data_key,
-                data_type=data_type,
+            # Create response using helper function
+            sqs_response = create_response_from_request_and_results(
+                request=message.body,
                 validation_results=detailed_results,
                 summary=enhanced_summary,
-                batch_id=getattr(message.body, 'batch_id', None),
-                source=getattr(message.body, 'source', None),
-                
-                # Legacy compatibility fields
-                total_rules=enhanced_summary.total_rules,
-                successful_rules=enhanced_summary.successful_rules,
-                failed_rules=enhanced_summary.failed_rules
+                processing_time_ms=processing_time,
+                status=MessageStatus.SUCCESS
             )
             
             # Always send response to output queue (required for SQS workflow)
-            output_sent = await self._send_to_output_queue(sqs_response)
-            
-            # Send callback if configured
-            if message.body.callback_url:
-                await self._send_callback(message.body.callback_url, sqs_response)
+            output_sent = await self._send_to_output_queue(sqs_response, message.message_id)
             
             self.processed_count += 1
             
             return ProcessingResult(
                 success=True,
-                message_id=message.body.message_id,
+                message_id=message.message_id,
                 processing_time_ms=processing_time,
                 response=sqs_response,
                 should_delete=True
@@ -120,31 +120,24 @@ class MessageProcessor:
             self.error_count += 1
             processing_time = int((time.time() - start_time) * 1000)
             
-            logger.error(f"Failed to process message {message.body.message_id}: {e}")
+            logger.error(f"Failed to process message {message.message_id}: {e}")
             
             # Determine retry logic
             should_retry = (
-                message.body.retry_count < (message.body.max_retries or self.settings.max_retries) and
+                message.attempts < self.settings.max_retries and
                 not self._is_permanent_error(e)
             )
             
-            # Get data information for error response
-            if hasattr(message.body, 'data_entry') and message.body.data_entry:
-                error_data_key = message.body.data_entry.data_key
-                error_data_type = message.body.data_entry.data_type
-                error_data_rows = len(message.body.data_entry.data) if message.body.data_entry.data else 0
-                error_data_cols = len(message.body.data_entry.columns) if message.body.data_entry.columns else 0
-            else:
-                error_data_key = f"legacy-{message.body.message_id}"
-                error_data_type = DataType.TABULAR
-                error_data_rows = len(message.body.data) if message.body.data else 0
-                error_data_cols = len(message.body.data[0].keys()) if message.body.data and len(message.body.data) > 0 else 0
+            # Get data information for error summary
+            data_entry = message.body.data_entry
+            error_data_rows = len(data_entry.data) if isinstance(data_entry.data, list) else 1
+            error_data_cols = len(data_entry.data.keys()) if isinstance(data_entry.data, dict) else 0
             
             # Create error summary
             error_summary = ValidationSummary(
-                total_rules=len(getattr(message.body, 'validation_rules', []) or getattr(message.body, 'rules', [])),
+                total_rules=len(data_entry.validation_rules),
                 successful_rules=0,
-                failed_rules=0,
+                failed_rules=len(data_entry.validation_rules),
                 success_rate=0.0,
                 total_rows=error_data_rows,
                 total_columns=error_data_cols,
@@ -152,33 +145,21 @@ class MessageProcessor:
                 validation_engine="great_expectations"
             )
             
-            # Create error response
-            error_response = SQSValidationResponse(
-                message_id=message.body.message_id,
-                correlation_id=message.body.correlation_id,
-                processing_time_ms=processing_time,
-                status=MessageStatus.RETRY if should_retry else MessageStatus.FAILED,
-                worker_id=self.worker_id,
-                data_key=error_data_key,
-                data_type=error_data_type,
+            # Create error response using helper function with empty results
+            error_response = create_response_from_request_and_results(
+                request=message.body,
+                validation_results=[],
                 summary=error_summary,
-                error_message=str(e),
-                error_code=type(e).__name__,
-                batch_id=getattr(message.body, 'batch_id', None),
-                source=getattr(message.body, 'source', None),
-                
-                # Legacy compatibility fields
-                total_rules=error_summary.total_rules,
-                successful_rules=error_summary.successful_rules,
-                failed_rules=error_summary.failed_rules
+                processing_time_ms=processing_time,
+                status=MessageStatus.FAILED
             )
             
             # Send error response to output queue for tracking
-            await self._send_to_output_queue(error_response)
+            await self._send_to_output_queue(error_response, message.message_id)
             
             return ProcessingResult(
                 success=False,
-                message_id=message.body.message_id,
+                message_id=message.message_id,
                 processing_time_ms=processing_time,
                 response=error_response,
                 error=str(e),
@@ -231,12 +212,13 @@ class MessageProcessor:
         except Exception as e:
             logger.error(f"Failed to send callback to {callback_url}: {e}")
 
-    async def _send_to_output_queue(self, response: SQSValidationResponse) -> bool:
+    async def _send_to_output_queue(self, response: SQSValidationResponse, original_message_id: str) -> bool:
         """
         Send validation response to output SQS queue
         
         Args:
             response: Validation response to send
+            original_message_id: ID of the original message being processed
             
         Returns:
             True if successful, False otherwise
@@ -250,17 +232,17 @@ class MessageProcessor:
                 )
                 
                 if message_id:
-                    logger.info(f"Response sent to output queue: {message_id} for message {response.message_id}")
+                    logger.info(f"Response sent to output queue: {message_id} for message {original_message_id}")
                     return True
                 else:
-                    logger.error(f"Failed to send response to output queue for message {response.message_id}")
+                    logger.error(f"Failed to send response to output queue for message {original_message_id}")
                     return False
             else:
                 logger.warning("Output queue URL not configured, cannot send response")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error sending response to output queue for message {response.message_id}: {e}")
+            logger.error(f"Error sending response to output queue for message {original_message_id}: {e}")
             return False
 
     def process_batch(self, messages: List[SQSMessageWrapper]) -> List[ProcessingResult]:
@@ -340,8 +322,19 @@ class MessageProcessor:
         try:
             while self.is_running:
                 try:
-                    # Receive messages from queue
-                    messages = self.sqs_client.receive_messages()
+                    # Check if we should stop before receiving messages
+                    if not self.is_running:
+                        break
+                    
+                    # Receive messages from queue (run in executor to allow cancellation)
+                    loop = asyncio.get_event_loop()
+                    messages = await loop.run_in_executor(
+                        None, self.sqs_client.receive_messages
+                    )
+                    
+                    # Check again after receiving messages
+                    if not self.is_running:
+                        break
                     
                     if messages:
                         consecutive_empty_polls = 0
@@ -366,13 +359,18 @@ class MessageProcessor:
                             logger.debug("No messages received, sleeping...")
                             await asyncio.sleep(self.settings.poll_interval)
                             consecutive_empty_polls = 0
+                    
+                    # Short sleep to allow cancellation to be checked
+                    await asyncio.sleep(0.1)
                 
                 except Exception as e:
-                    logger.error(f"Error in worker loop: {e}")
-                    await asyncio.sleep(5)  # Brief pause before retrying
+                    if self.is_running:  # Only log errors if still running
+                        logger.error(f"Error in worker loop: {e}")
+                        await asyncio.sleep(5)  # Brief pause before retrying
                     
         except asyncio.CancelledError:
             logger.info(f"Worker {self.worker_id} cancelled")
+            raise  # Re-raise to ensure proper cancellation
         finally:
             self.is_running = False
             logger.info(f"Worker {self.worker_id} stopped")
