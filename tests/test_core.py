@@ -191,12 +191,13 @@ class TestValidatorImplementations:
     def test_column_exists_validator(self):
         """Test column exists validator"""
         try:
-            from app.validators.expect_column_to_exist import expect_column_to_exist
+            from app.validators.expect_column_to_exist import validate_column_to_exist
+            from app.models.rule import Rule
             
             data = [{"name": "John", "age": 25}]
-            rule = ValidationRule(rule_name="expect_column_to_exist", column_name="name")
+            rule = Rule(rule_name="expect_column_to_exist", column_name="name")
             
-            result = expect_column_to_exist(data, rule)
+            result = validate_column_to_exist(data, rule)
             assert isinstance(result, dict)
             assert 'success' in result
         except ImportError as e:
@@ -205,16 +206,17 @@ class TestValidatorImplementations:
     def test_values_between_validator(self):
         """Test values between validator"""
         try:
-            from app.validators.expect_column_values_to_be_between import expect_column_values_to_be_between
+            from app.validators.expect_column_values_to_be_between import validate_column_values_to_be_between
+            from app.models.rule import Rule
             
             data = [{"age": 25}, {"age": 30}]
-            rule = ValidationRule(
+            rule = Rule(
                 rule_name="expect_column_values_to_be_between",
                 column_name="age",
                 value={"min_value": 18, "max_value": 65}
             )
             
-            result = expect_column_values_to_be_between(data, rule)
+            result = validate_column_values_to_be_between(data, rule)
             assert isinstance(result, dict)
             assert 'success' in result
         except ImportError as e:
@@ -227,8 +229,9 @@ class TestUtilityFunctions:
     def test_gx_utils_import(self):
         """Test that GX utils can be imported"""
         try:
-            from app.validators.gx_utils import create_gx_dataset
-            assert callable(create_gx_dataset)
+            from app.validators.gx_utils import validate_with_gx, get_gx_validator
+            assert callable(validate_with_gx)
+            assert callable(get_gx_validator)
         except ImportError as e:
             pytest.skip(f"GX utils not available: {e}")
 

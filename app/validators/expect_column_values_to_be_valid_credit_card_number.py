@@ -14,9 +14,15 @@ def validate_column_values_to_be_valid_credit_card_number(data: List[Dict[str, A
     Returns:
         Dictionary with validation result
     """
-    return validate_with_gx(
+    result = validate_with_gx(
         data=data,
         expectation_type="expect_column_values_to_be_valid_credit_card_number",
         column=rule.column_name,
         rule=rule
     )
+    
+    # Add rule_name and column_name to the result
+    result["rule_name"] = rule.rule_name
+    result["column_name"] = rule.column_name
+    
+    return result
