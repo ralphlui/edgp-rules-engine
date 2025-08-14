@@ -19,7 +19,7 @@ def validate_compound_columns_to_be_unique(data: List[Dict[str, Any]], rule: Rul
     if not rule.value or not isinstance(rule.value, dict) or "column_list" not in rule.value:
         return {
             "rule_name": rule.rule_name,
-            "column_name": None,
+            "column_name": rule.column_name,
             "success": False,
             "error": "Rule value must contain column_list"
         }
@@ -29,7 +29,7 @@ def validate_compound_columns_to_be_unique(data: List[Dict[str, Any]], rule: Rul
     if not isinstance(column_list, list) or len(column_list) == 0:
         return {
             "rule_name": rule.rule_name,
-            "column_name": None,
+            "column_name": rule.column_name,
             "success": False,
             "error": "column_list must be a non-empty list"
         }
@@ -39,7 +39,7 @@ def validate_compound_columns_to_be_unique(data: List[Dict[str, Any]], rule: Rul
     if missing_columns:
         return {
             "rule_name": rule.rule_name,
-            "column_name": None,
+            "column_name": rule.column_name,
             "success": False,
             "error": f"Columns not found: {missing_columns}"
         }
@@ -58,7 +58,7 @@ def validate_compound_columns_to_be_unique(data: List[Dict[str, Any]], rule: Rul
         
         result = {
             "rule_name": rule.rule_name,
-            "column_name": None,
+            "column_name": rule.column_name,  # Use the rule's column_name
             "success": success,
             "result": {
                 "element_count": total_count,
@@ -78,7 +78,7 @@ def validate_compound_columns_to_be_unique(data: List[Dict[str, Any]], rule: Rul
     except Exception as e:
         return {
             "rule_name": rule.rule_name,
-            "column_name": None,
+            "column_name": rule.column_name,
             "success": False,
             "error": f"Validation error: {str(e)}"
         }

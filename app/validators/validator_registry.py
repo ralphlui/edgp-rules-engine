@@ -193,3 +193,7 @@ def validate_rule(data: List[Dict[str, Any]], rule: Rule) -> Dict[str, Any]:
             "success": False,
             "error": f"Unexpected error during validation: {str(e)}"
         }
+
+
+# For backward compatibility - expose the validator mapping as VALIDATORS
+VALIDATORS = VALIDATOR_MAPPING
