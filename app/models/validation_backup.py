@@ -2,7 +2,7 @@
 Unified validation models for the rules engine.
 This module provides consistent input/output types across API and SQS interfaces.
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, validator
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timezone
 from enum import Enum
