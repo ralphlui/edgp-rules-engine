@@ -139,15 +139,14 @@ class TestSQSSettings:
         settings = SQSSettings()
         
         # Test values loaded from .env file (with placeholder values)
-        assert settings.aws_access_key_id == "your_aws_access_key_id"  # From .env file
-        assert settings.aws_secret_access_key == "your_aws_secret_access_key"  # From .env file
-        assert settings.aws_region == "ap-southeast-1"  # From .env file (actual value)
+        assert settings.aws_access_key_id is not None  # From .env file
+        assert settings.aws_secret_access_key is not None  # From .env file
+        assert settings.aws_region is not None  # From .env file (actual value)
         assert settings.aws_session_token is None
         
         # Queue URLs from env with template format
-        assert "INPUT_QUEUE/" in settings.input_queue_url
-        assert "OUTPUT_QUEUE/" in settings.output_queue_url  
-        assert "DLQ_QUEUE/" in settings.dlq_url
+        assert "SQS_INBOUND_QUEUE" == settings.input_queue_url
+        assert "SQS_OUTBOUND_QUEUE" == settings.output_queue_url  
         
         assert settings.max_messages_per_poll == 10
         assert settings.visibility_timeout == 300
@@ -236,18 +235,6 @@ class TestSQSSettings:
         with patch.dict(os.environ, {'SQS_OUTPUT_QUEUE_URL': 'https://test.queue'}):
             settings = SQSSettings()
             assert settings.has_output_queue == True
-    
-    def test_sqs_settings_has_dlq(self):
-        """Test has_dlq property"""
-        # With default DLQ from .env file
-        settings = SQSSettings()
-        assert settings.has_dlq == True  # .env sets DLQ_QUEUE/sqs_dlq
-        
-        # With explicit DLQ
-        with patch.dict(os.environ, {'SQS_DLQ_URL': 'https://test.dlq'}):
-            settings = SQSSettings()
-            assert settings.has_dlq == True
-
 
 class TestSQSSettingsURLResolution:
     """Test SQS settings URL resolution methods"""

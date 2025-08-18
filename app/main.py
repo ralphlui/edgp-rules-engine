@@ -85,6 +85,10 @@ async def startup_event():
             from app.sqs.config import SQSSettings
             sqs_settings = SQSSettings()
             
+            # Print the SQS queue URLs for debugging
+            print(f"🔗 SQS Input Queue URL: {sqs_settings.input_queue_url}")
+            print(f"🔗 SQS Output Queue URL: {sqs_settings.output_queue_url}")
+            
             if sqs_settings.auto_start_workers:
                 logger.info("🔄 Auto-starting SQS workers...")
                 # Start SQS processing in background but track the task
