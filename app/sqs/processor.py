@@ -228,7 +228,7 @@ class MessageProcessor:
             if self.settings.output_queue_url:
                 message_id = self.sqs_client.send_message(
                     response.model_dump(),
-                    queue_url=self.settings.output_queue_url
+                    queue_url=self.settings.get_output_queue_url()
                 )
                 
                 if message_id:

@@ -48,7 +48,7 @@ class SQSClient:
             List of wrapped SQS messages
         """
         if not queue_url:
-            queue_url = self.settings.input_queue_url
+            queue_url = self.settings.get_input_queue_url()
             
         try:
             response = self.sqs.receive_message(
@@ -109,7 +109,7 @@ class SQSClient:
             True if successful, False otherwise
         """
         if not queue_url:
-            queue_url = self.settings.input_queue_url
+            queue_url = self.settings.get_input_queue_url()
             
         try:
             self.sqs.delete_message(
@@ -138,7 +138,7 @@ class SQSClient:
             Message ID if successful, None otherwise
         """
         if not queue_url:
-            queue_url = self.settings.output_queue_url
+            queue_url = self.settings.get_output_queue_url()
             
         try:
             params = {
@@ -185,7 +185,7 @@ class SQSClient:
             "attempts": message.attempts
         }
         
-        message_id = self.send_message(dlq_message, self.settings.dlq_url)
+        message_id = self.send_message(dlq_message, self.settings.get_dlq_url())
         return message_id is not None
 
     def change_message_visibility(self, receipt_handle: str, visibility_timeout: int, 
@@ -202,7 +202,7 @@ class SQSClient:
             True if successful, False otherwise
         """
         if not queue_url:
-            queue_url = self.settings.input_queue_url
+            queue_url = self.settings.get_input_queue_url()
             
         try:
             self.sqs.change_message_visibility(
@@ -249,7 +249,7 @@ class SQSClient:
         
         # Input queue stats
         if self.settings.input_queue_url:
-            input_attrs = self.get_queue_attributes(self.settings.input_queue_url)
+            input_attrs = self.get_queue_attributes(self.settings.get_input_queue_url())
             if input_attrs:
                 stats['input_queue'] = {
                     'approximate_number_of_messages': input_attrs.get('ApproximateNumberOfMessages', '0'),
@@ -259,7 +259,7 @@ class SQSClient:
         
         # Output queue stats
         if self.settings.output_queue_url:
-            output_attrs = self.get_queue_attributes(self.settings.output_queue_url)
+            output_attrs = self.get_queue_attributes(self.settings.get_output_queue_url())
             if output_attrs:
                 stats['output_queue'] = {
                     'approximate_number_of_messages': output_attrs.get('ApproximateNumberOfMessages', '0'),
@@ -268,7 +268,7 @@ class SQSClient:
         
         # DLQ stats
         if self.settings.dlq_url:
-            dlq_attrs = self.get_queue_attributes(self.settings.dlq_url)
+            dlq_attrs = self.get_queue_attributes(self.settings.get_dlq_url())
             if dlq_attrs:
                 stats['dlq'] = {
                     'approximate_number_of_messages': dlq_attrs.get('ApproximateNumberOfMessages', '0')
@@ -298,17 +298,17 @@ class SQSClient:
             
             # Test input queue
             if self.settings.input_queue_url:
-                attrs = self.get_queue_attributes(self.settings.input_queue_url)
+                attrs = self.get_queue_attributes(self.settings.get_input_queue_url())
                 health['input_queue'] = attrs is not None
             
             # Test output queue
             if self.settings.output_queue_url:
-                attrs = self.get_queue_attributes(self.settings.output_queue_url)
+                attrs = self.get_queue_attributes(self.settings.get_output_queue_url())
                 health['output_queue'] = attrs is not None
             
             # Test DLQ
             if self.settings.dlq_url:
-                attrs = self.get_queue_attributes(self.settings.dlq_url)
+                attrs = self.get_queue_attributes(self.settings.get_dlq_url())
                 health['dlq'] = attrs is not None
                 
         except Exception as e:

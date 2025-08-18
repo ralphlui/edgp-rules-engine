@@ -102,6 +102,74 @@ class SQSSettings(BaseSettings):
         if not self.dlq_url and self.sqs_dlq_url:
             self.dlq_url = self.sqs_dlq_url
     
+    def build_queue_url(self, url_template: Optional[str], queue_base_name: Optional[str] = None, 
+                       account_id: Optional[str] = None, region: Optional[str] = None) -> Optional[str]:
+        """
+        Build a full SQS queue URL from a template and runtime parameters.
+        
+        Supports templates like:
+        - INPUT_QUEUE/my_queue -> https://sqs.{region}.amazonaws.com/{account_id}/my_queue
+        - OUTPUT_QUEUE/my_output -> https://sqs.{region}.amazonaws.com/{account_id}/my_output
+        - https://full.url/path -> returns as-is (already full URL)
+        
+        Args:
+            url_template: Template string or full URL
+            queue_base_name: Override queue name from template
+            account_id: AWS account ID (from environment or parameter)
+            region: AWS region (defaults to configured region)
+            
+        Returns:
+            Full SQS queue URL or None if template is invalid
+        """
+        if not url_template:
+            return None
+            
+        # If already a full URL (starts with https://), return as-is
+        if url_template.startswith('https://'):
+            return url_template
+            
+        # Get runtime parameters from environment if not provided
+        account_id = account_id or os.getenv('AWS_ACCOUNT_ID') or os.getenv('SQS_ACCOUNT_ID')
+        region = region or self.aws_region
+        
+        if not account_id:
+            # Try to extract account ID from existing full URLs in environment
+            for env_var in ['SQS_INPUT_QUEUE_URL', 'SQS_OUTPUT_QUEUE_URL', 'SQS_DLQ_URL']:
+                existing_url = os.getenv(env_var, '')
+                if 'amazonaws.com/' in existing_url:
+                    try:
+                        account_id = existing_url.split('amazonaws.com/')[1].split('/')[0]
+                        break
+                    except IndexError:
+                        continue
+        
+        if not account_id:
+            # Cannot build URL without account ID
+            return url_template  # Return template as-is, let AWS SDK handle the error
+            
+        # Parse template (format: TEMPLATE_NAME/queue_name)
+        if '/' in url_template:
+            template_type, queue_name = url_template.split('/', 1)
+            queue_name = queue_base_name or queue_name
+        else:
+            # Assume it's just a queue name
+            queue_name = queue_base_name or url_template
+            
+        # Build full URL
+        return f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
+    
+    def get_input_queue_url(self, account_id: Optional[str] = None, region: Optional[str] = None) -> Optional[str]:
+        """Get the resolved input queue URL"""
+        return self.build_queue_url(self.input_queue_url, account_id=account_id, region=region)
+    
+    def get_output_queue_url(self, account_id: Optional[str] = None, region: Optional[str] = None) -> Optional[str]:
+        """Get the resolved output queue URL"""
+        return self.build_queue_url(self.output_queue_url, account_id=account_id, region=region)
+    
+    def get_dlq_url(self, account_id: Optional[str] = None, region: Optional[str] = None) -> Optional[str]:
+        """Get the resolved DLQ URL"""
+        return self.build_queue_url(self.dlq_url, account_id=account_id, region=region)
+    
     @property
     def has_output_queue(self) -> bool:
         """Check if output queue is configured"""

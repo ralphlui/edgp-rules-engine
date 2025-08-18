@@ -126,13 +126,23 @@ def validate_with_gx(data: List[Dict[str, Any]], expectation_type: str, column: 
         # Run the expectation with column as first argument
         result = expectation_func(column=column, **kwargs)
         
-        return {
-            "success": result.success,
-            "message": f"Great Expectations validation passed for {expectation_type}" if result.success else None,
-            "error": f"Great Expectations validation failed: {result.result}" if not result.success else None,
-            "result": result.result,
-            "meta": result.meta
-        }
+        # Create response based on result
+        if result.success:
+            return {
+                "success": True,
+                "message": f"Column '{column}' exists",
+                "error": None,
+                "result": result.result,
+                "meta": result.meta
+            }
+        else:
+            return {
+                "success": False,
+                "message": None,
+                "error": f"Column '{column}' does not exist",
+                "result": result.result,
+                "meta": result.meta
+            }
         
     except Exception as e:
         return {
