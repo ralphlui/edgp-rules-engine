@@ -59,7 +59,7 @@ class ValidationResultDetail(BaseModel):
     rule_name: str = Field(..., description="Name of the validation rule")
     column_name: Optional[str] = Field(default=None, description="Column that was validated")
     success: bool = Field(..., description="Whether the validation passed")
-    message: str = Field(..., description="Human-readable validation result message")
+    message: Optional[str] = Field(default=None, description="Human-readable validation result message")
     
     # Detailed information
     expected: Optional[Any] = Field(default=None, description="Expected value or condition")
