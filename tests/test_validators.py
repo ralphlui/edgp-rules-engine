@@ -1335,3 +1335,498 @@ class TestSpecificValidators:
         assert "success" in result
         assert result["rule_name"] == "expect_column_min_to_be_between"
         assert result["column_name"] == "nonexistent_column"
+
+
+# Tests merged from test_expect_column_values_to_be_of_type.py
+
+class TestValidateColumnValuesToBeOfTypeComprehensive:
+    """Comprehensive tests for validate_column_values_to_be_of_type function (merged from separate test file)"""
+
+    def test_integer_type_validation_success(self):
+        """Test successful integer type validation"""
+        data = [
+            {"id": 1, "name": "John"},
+            {"id": 2, "name": "Jane"},
+            {"id": 3, "name": "Bob"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["rule_name"] == "expect_column_values_to_be_of_type"
+        assert result["column_name"] == "id"
+        assert result["result"]["element_count"] == 3
+        assert result["result"]["unexpected_count"] == 0
+        assert result["result"]["expected_type"] == "INTEGER"
+
+    def test_string_type_validation_success(self):
+        """Test successful string type validation"""
+        data = [
+            {"id": 1, "name": "John"},
+            {"id": 2, "name": "Jane"},
+            {"id": 3, "name": "Bob"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="name",
+            value={"type_": "STRING"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "STRING"
+
+    def test_varchar_type_validation_success(self):
+        """Test successful VARCHAR type validation (alias for STRING)"""
+        data = [
+            {"name": "Alice", "description": "Engineer"},
+            {"name": "Bob", "description": "Designer"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="description",
+            value={"type_": "VARCHAR"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "VARCHAR"
+
+    def test_text_type_validation_success(self):
+        """Test successful TEXT type validation (alias for STRING)"""
+        data = [
+            {"content": "This is some text"},
+            {"content": "Another text entry"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="content",
+            value={"type_": "TEXT"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "TEXT"
+
+    def test_boolean_type_validation_success(self):
+        """Test successful boolean type validation"""
+        data = [
+            {"is_active": True, "is_verified": False},
+            {"is_active": False, "is_verified": True}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="is_active",
+            value={"type_": "BOOLEAN"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "BOOLEAN"
+
+    def test_float_type_validation_success(self):
+        """Test successful float type validation"""
+        data = [
+            {"price": 19.99, "discount": 0.1},
+            {"price": 29.95, "discount": 0.15},
+            {"price": 39.90, "discount": 0.2}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="price",
+            value={"type_": "FLOAT"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "FLOAT"
+
+    def test_mixed_type_validation_failure(self):
+        """Test type validation failure with mixed types"""
+        data = [
+            {"id": 1, "value": "text"},
+            {"id": "two", "value": "more text"},  # Mixed types
+            {"id": 3, "value": "even more text"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert result["result"]["unexpected_count"] == 1
+        assert result["result"]["unexpected_percent"] > 0
+        assert "two" in result["result"]["partial_unexpected_list"]
+        assert "error" in result
+
+    def test_all_wrong_type_validation_failure(self):
+        """Test type validation failure when all values are wrong type"""
+        data = [
+            {"id": "one", "name": "John"},
+            {"id": "two", "name": "Jane"},
+            {"id": "three", "name": "Bob"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert result["result"]["unexpected_count"] == 3
+        assert result["result"]["unexpected_percent"] == 100.0
+        assert len(result["result"]["partial_unexpected_list"]) == 3
+
+    def test_column_not_found_error(self):
+        """Test error when column doesn't exist"""
+        data = [
+            {"id": 1, "name": "John"},
+            {"id": 2, "name": "Jane"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="non_existent_column",
+            value={"type_": "STRING"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert "Column 'non_existent_column' not found in dataset" in result["error"]
+
+    def test_missing_type_specification_error(self):
+        """Test error when type_ is not specified in rule value"""
+        data = [
+            {"id": 1, "name": "John"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={}  # Missing type_ specification
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert "Rule value must contain type_ specification" in result["error"]
+
+    def test_none_rule_value_error(self):
+        """Test error when rule value is None"""
+        data = [
+            {"id": 1, "name": "John"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value=None
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert "Rule value must contain type_ specification" in result["error"]
+
+    def test_invalid_rule_value_type_error(self):
+        """Test error when rule value is not a dictionary"""
+        data = [
+            {"id": 1, "name": "John"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value="STRING"  # Should be dict
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert "Rule value must contain type_ specification" in result["error"]
+
+    def test_unsupported_type_error(self):
+        """Test error when specifying unsupported type"""
+        data = [
+            {"id": 1, "name": "John"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "UNSUPPORTED_TYPE"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert "Unsupported type: UNSUPPORTED_TYPE" in result["error"]
+
+    def test_case_insensitive_type_specification(self):
+        """Test that type specification is case insensitive"""
+        data = [
+            {"id": 1, "name": "John"},
+            {"id": 2, "name": "Jane"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "integer"}  # lowercase
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "INTEGER"
+
+    def test_null_values_handling(self):
+        """Test handling of null/None values"""
+        data = [
+            {"id": 1, "name": "John"},
+            {"id": 2, "name": None},  # Null value
+            {"id": 3, "name": "Bob"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="name",
+            value={"type_": "STRING"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        # Should ignore null values and only check non-null ones
+        assert result["success"] == True
+        assert result["result"]["element_count"] == 2  # Only non-null values counted
+
+    def test_empty_dataset_handling(self):
+        """Test handling of empty dataset"""
+        data = []
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert "Column 'id' not found in dataset" in result["error"]
+
+    def test_all_null_values_handling(self):
+        """Test handling when all values in column are null"""
+        data = [
+            {"id": 1, "name": None},
+            {"id": 2, "name": None},
+            {"id": 3, "name": None}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="name",
+            value={"type_": "STRING"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        # All null values should result in success with 0 elements checked
+        assert result["success"] == True
+        assert result["result"]["element_count"] == 0
+
+    def test_partial_unexpected_list_limitation(self):
+        """Test that partial unexpected list is limited to first 20 values"""
+        # Create data with many unexpected values
+        data = []
+        for i in range(25):
+            data.append({"id": f"string_{i}", "value": i})
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert result["result"]["unexpected_count"] == 25
+        assert len(result["result"]["partial_unexpected_list"]) == 20  # Limited to 20
+
+    def test_datetime_type_validation(self):
+        """Test datetime type validation"""
+        from datetime import datetime
+        # Create datetime data
+        now = datetime.now()
+        data = [
+            {"timestamp": now, "event": "start"},
+            {"timestamp": datetime(2023, 1, 1), "event": "middle"},
+            {"timestamp": datetime(2023, 12, 31), "event": "end"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="timestamp",
+            value={"type_": "DATETIME"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["expected_type"] == "DATETIME"
+
+    def test_date_type_validation(self):
+        """Test date type validation (alias for datetime)"""
+        from datetime import datetime
+        now = datetime.now().date()
+        data = [
+            {"date_field": now, "description": "today"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="date_field",
+            value={"type_": "DATE"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["result"]["expected_type"] == "DATE"
+
+    def test_type_checker_exception_handling(self):
+        """Test handling of exceptions in type checking"""
+        data = [
+            {"complex_field": {"nested": "object"}, "id": 1}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="complex_field",
+            value={"type_": "STRING"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        # Complex objects should be treated as unexpected values
+        assert result["success"] == False
+        assert result["result"]["unexpected_count"] > 0
+
+    def test_mixed_numeric_types(self):
+        """Test validation with mixed integer and float values"""
+        data = [
+            {"value": 1, "name": "first"},      # Integer
+            {"value": 2.0, "name": "second"},   # Float that looks like int
+            {"value": 3.5, "name": "third"}     # Clear float
+        ]
+        
+        # Test INTEGER validation on mixed numeric data
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="value",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        # Should have some unexpected values (floats)
+        assert result["result"]["element_count"] == 3
+        assert result["result"]["unexpected_count"] > 0
+
+    def test_zero_and_negative_numbers(self):
+        """Test validation with zero and negative numbers"""
+        data = [
+            {"value": 0, "type": "zero"},
+            {"value": -1, "type": "negative"},
+            {"value": -100, "type": "large_negative"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="value",
+            value={"type_": "INTEGER"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["unexpected_count"] == 0
+
+    def test_boolean_edge_cases(self):
+        """Test boolean validation with edge cases"""
+        data = [
+            {"flag": True, "name": "true"},
+            {"flag": False, "name": "false"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="flag",
+            value={"type_": "BOOLEAN"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["unexpected_count"] == 0
+
+    def test_string_number_validation(self):
+        """Test string validation on numeric strings"""
+        data = [
+            {"id_str": "123", "name": "first"},
+            {"id_str": "456", "name": "second"},
+            {"id_str": "789", "name": "third"}
+        ]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="id_str",
+            value={"type_": "STRING"}
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == True
+        assert result["result"]["unexpected_count"] == 0
+
+    def test_percentage_calculation_edge_cases(self):
+        """Test percentage calculation edge cases"""
+        # Test with single value
+        data = [{"value": 1}]
+        
+        rule = Rule(
+            rule_name="expect_column_values_to_be_of_type",
+            column_name="value",
+            value={"type_": "STRING"}  # Should fail
+        )
+        
+        result = expect_column_values_to_be_of_type.validate_column_values_to_be_of_type(data, rule)
+        
+        assert result["success"] == False
+        assert result["result"]["unexpected_percent"] == 100.0
+        assert result["result"]["element_count"] == 1
+        assert result["result"]["unexpected_count"] == 1

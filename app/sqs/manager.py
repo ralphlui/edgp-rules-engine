@@ -63,6 +63,29 @@ class SQSManager:
         finally:
             self.is_running = False
     
+    async def start_workers(self):
+        """Start the SQS workers without blocking (non-blocking version)"""
+        if self.is_running:
+            logger.warning("SQS Manager is already running")
+            return
+        
+        logger.info(f"Starting SQS Manager with {self.settings.worker_count} workers")
+        self.start_time = datetime.now()
+        self.is_running = True
+        
+        # Create and start workers
+        self.worker_tasks = []
+        for i in range(self.settings.worker_count):
+            worker = MessageProcessor(self.settings, self.sqs_client)
+            self.workers.append(worker)
+            
+            # Start worker as async task
+            task = asyncio.create_task(worker.run_worker_loop())
+            self.worker_tasks.append(task)
+        
+        logger.info(f"All {len(self.workers)} workers started successfully in background")
+        # Note: We don't await the tasks here, they run in the background
+    
     async def stop(self):
         """Stop the SQS manager and all workers"""
         if not self.is_running:
@@ -314,7 +337,12 @@ def get_sqs_manager() -> SQSManager:
     return _sqs_manager
 
 async def start_sqs_processing():
-    """Start SQS processing (for use in FastAPI startup)"""
+    """Start SQS processing (for use in FastAPI startup) - NON-BLOCKING"""
+    manager = get_sqs_manager()
+    await manager.start_workers()  # Use non-blocking version
+
+async def start_sqs_processing_blocking():
+    """Start SQS processing and wait for completion - BLOCKING"""
     manager = get_sqs_manager()
     await manager.start()
 

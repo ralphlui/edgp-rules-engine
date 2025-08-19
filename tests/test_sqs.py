@@ -436,7 +436,9 @@ class TestSQSManager:
         """Mock SQS client"""
         return MagicMock()
     
-    def test_sqs_manager_init(self, mock_settings):
+    @patch.dict('os.environ', {'SQS_AWS_REGION': 'ap-southeast-1'})
+    @patch('app.sqs.manager.SQSClient')
+    def test_sqs_manager_init(self, mock_sqs_client, mock_settings):
         """Test SQS manager initialization"""
         try:
             manager = SQSManager(mock_settings)
