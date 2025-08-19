@@ -51,6 +51,7 @@ class SQSSettings(BaseSettings):
     """SQS-specific configuration settings"""
     
     # AWS Configuration
+    app_env: Optional[str] = Field(default=None, description="Application environment")
     aws_access_key_id: Optional[str] = Field(default=None, description="AWS Access Key ID")
     aws_secret_access_key: Optional[str] = Field(default=None, description="AWS Secret Access Key")
     aws_region: str = Field(default="us-east-1", description="AWS Region")
@@ -59,11 +60,11 @@ class SQSSettings(BaseSettings):
     # SQS Queue Configuration
     input_queue_url: Optional[str] = Field(default=None, description="Input SQS Queue URL for validation requests")
     output_queue_url: Optional[str] = Field(default=None, description="Output SQS Queue URL for validation results")
-    dlq_url: Optional[str] = Field(default=None, description="Dead Letter Queue URL for failed messages")
     
     # Legacy support (can be removed later)
     sqs_queue_url: Optional[str] = Field(default=None, description="Legacy queue URL (use input_queue_url instead)")
     sqs_dlq_url: Optional[str] = Field(default=None, description="Legacy DLQ URL (use dlq_url instead)")
+    dlq_url: Optional[str] = Field(default=None, description="Dead Letter Queue URL for failed messages")
     
     # Processing Configuration
     max_messages_per_poll: int = Field(default=10, ge=1, le=10, description="Maximum messages to retrieve per poll (1-10)")
@@ -91,14 +92,44 @@ class SQSSettings(BaseSettings):
         case_sensitive=False,
         extra="ignore"
     )
-    
+
     def model_post_init(self, __context) -> None:
-        """Handle backward compatibility and validation"""
-        # Handle legacy queue URL
+        """Handle runtime environment variable overrides and backward compatibility"""
+        # Override with runtime environment variables if they exist (SQS_ prefixed)
+        if os.getenv("SQS_APP_ENV"):
+            self.app_env = os.getenv("SQS_APP_ENV")
+        if os.getenv("SQS_AWS_ACCESS_KEY_ID"):
+            self.aws_access_key_id = os.getenv("SQS_AWS_ACCESS_KEY_ID")
+        if os.getenv("SQS_AWS_SECRET_ACCESS_KEY"):
+            self.aws_secret_access_key = os.getenv("SQS_AWS_SECRET_ACCESS_KEY")
+        if os.getenv("SQS_AWS_REGION"):
+            self.aws_region = os.getenv("SQS_AWS_REGION")
+        if os.getenv("SQS_INPUT_QUEUE_URL"):
+            self.input_queue_url = os.getenv("SQS_INPUT_QUEUE_URL")
+        if os.getenv("SQS_OUTPUT_QUEUE_URL"):
+            self.output_queue_url = os.getenv("SQS_OUTPUT_QUEUE_URL")
+        
+        # Handle runtime environment variables passed directly (non-prefixed)
+        # This allows passing AWS_REGION, AWS_ACCESS_KEY_ID, etc. at runtime
+        # Check if current values are references to environment variable names
+        if self.app_env and self.app_env in os.environ:
+            self.app_env = os.getenv(self.app_env)
+        if self.aws_access_key_id and self.aws_access_key_id in os.environ:
+            self.aws_access_key_id = os.getenv(self.aws_access_key_id)
+        if self.aws_secret_access_key and self.aws_secret_access_key in os.environ:
+            self.aws_secret_access_key = os.getenv(self.aws_secret_access_key)
+        if self.aws_region and self.aws_region in os.environ:
+            self.aws_region = os.getenv(self.aws_region)
+        if self.input_queue_url and self.input_queue_url in os.environ:
+            self.input_queue_url = os.getenv(self.input_queue_url)
+        if self.output_queue_url and self.output_queue_url in os.environ:
+            self.output_queue_url = os.getenv(self.output_queue_url)
+        
+        # Handle legacy queue URL mapping
         if not self.input_queue_url and self.sqs_queue_url:
             self.input_queue_url = self.sqs_queue_url
         
-        # Handle legacy DLQ URL  
+        # Handle legacy DLQ URL mapping
         if not self.dlq_url and self.sqs_dlq_url:
             self.dlq_url = self.sqs_dlq_url
     

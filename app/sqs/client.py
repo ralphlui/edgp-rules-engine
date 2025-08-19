@@ -32,7 +32,7 @@ class SQSClient:
             
             self.sqs = session.client('sqs')
             logger.info(f"SQS client connected to region: {self.settings.aws_region}")
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to SQS: {e}")
             raise
