@@ -79,7 +79,7 @@ def validate_data(request: ValidationRequest) -> ValidationResponse:
                     rule_name=rule_name,
                     column_name=column_name,
                     success=result.get("success", False),
-                    message=result.get("message", ""),
+                    message=result.get("message", "") or result.get("error", "") or f"Validation result for {rule_name}",
                     details=result.get("details", {}),
                     # Legacy compatibility
                     rule=rule_name,

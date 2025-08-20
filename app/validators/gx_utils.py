@@ -107,7 +107,7 @@ def validate_with_gx(data: List[Dict[str, Any]], expectation_type: str, column: 
     if not GX_AVAILABLE:
         return {
             "success": False,
-            "message": None,
+            "message": f"Great Expectations not available for '{expectation_type}' validation",
             "error": f"Great Expectations not available (Python 3.13 compatibility issue). Expectation '{expectation_type}' not supported.",
             "result": {},
             "meta": {}
@@ -130,7 +130,7 @@ def validate_with_gx(data: List[Dict[str, Any]], expectation_type: str, column: 
         if result.success:
             return {
                 "success": True,
-                "message": f"Column '{column}' exists",
+                "message": f"Validation passed for column '{column}'",
                 "error": None,
                 "result": result.result,
                 "meta": result.meta
@@ -138,8 +138,8 @@ def validate_with_gx(data: List[Dict[str, Any]], expectation_type: str, column: 
         else:
             return {
                 "success": False,
-                "message": None,
-                "error": f"Column '{column}' does not exist",
+                "message": f"Validation failed for column '{column}'",
+                "error": f"Column '{column}' validation failed",
                 "result": result.result,
                 "meta": result.meta
             }
@@ -147,7 +147,7 @@ def validate_with_gx(data: List[Dict[str, Any]], expectation_type: str, column: 
     except Exception as e:
         return {
             "success": False,
-            "message": None,
+            "message": f"Validation error for column '{column}': {str(e)}",
             "error": f"Great Expectations validation error: {str(e)}",
             "result": {},
             "meta": {}

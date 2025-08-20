@@ -47,7 +47,7 @@ def validate_column_pair_values_a_to_be_greater_than_b(data: List[Dict[str, Any]
             "success": result["success"],
             "rule_name": rule.rule_name,
             "column_name": f"{column_a} > {column_b}",
-            "message": result["message"] if result["success"] else None,
+            "message": result["message"],
             "error": result["error"] if not result["success"] else None
         }
         

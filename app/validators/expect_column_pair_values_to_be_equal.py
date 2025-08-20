@@ -44,7 +44,7 @@ def validate_column_pair_values_to_be_equal(data: List[Dict[str, Any]], rule: Ru
             "success": result["success"],
             "rule_name": rule.rule_name,
             "column_name": f"{column_a} = {column_b}",
-            "message": result["message"] if result["success"] else None,
+            "message": result["message"],
             "error": result["error"] if not result["success"] else None
         }
         

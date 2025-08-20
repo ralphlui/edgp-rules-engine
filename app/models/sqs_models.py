@@ -284,7 +284,7 @@ def create_response_from_request_and_results(
                 failed_validation = FailedValidation(
                     rule_name=result.rule_name,
                     column_name=result.column_name or "unknown",
-                    error_message=result.message,
+                    error_message=result.message or f"Validation failed for rule {result.rule_name}",
                     status="fail"
                 )
                 failed_validations.append(failed_validation)
