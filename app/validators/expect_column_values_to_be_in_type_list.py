@@ -43,7 +43,7 @@ def validate_column_values_to_be_in_type_list(data: List[Dict[str, Any]], rule: 
             "success": result["success"],
             "rule_name": rule.rule_name,
             "column_name": rule.column_name,
-            "message": result["message"] if result["success"] else None,
+            "message": result["message"],
             "error": result["error"] if not result["success"] else None
         }
         

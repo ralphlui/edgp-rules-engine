@@ -47,7 +47,7 @@ def validate_column_proportion_of_unique_values_to_be_between(data: List[Dict[st
             "success": result["success"],
             "rule_name": rule.rule_name,
             "column_name": rule.column_name,
-            "message": result["message"] if result["success"] else None,
+            "message": result["message"],
             "error": result["error"] if not result["success"] else None
         }
         

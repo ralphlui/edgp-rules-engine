@@ -44,7 +44,7 @@ def validate_column_value_lengths_to_equal(data: List[Dict[str, Any]], rule: Rul
             "success": result["success"],
             "rule_name": rule.rule_name,
             "column_name": rule.column_name,
-            "message": result["message"] if result["success"] else None,
+            "message": result["message"],
             "error": result["error"] if not result["success"] else None
         }
         
