@@ -149,7 +149,7 @@ class TestSettings:
         settings = Settings()
         
         # Test default values
-        assert settings.host == "localhost"  # From .env file
+        assert settings.host == "0.0.0.0"  # From .env file
         assert settings.port == 8090
         assert settings.environment == "development"
         assert settings.api_title == "EDGP Rules Engine API"
@@ -319,7 +319,7 @@ class TestSettingsIntegration:
             settings = Settings()
             
             # Should use values from env file or code defaults
-            assert settings.host == "localhost"  # from .env file
+            assert settings.host == "0.0.0.0"  # from .env file
             assert settings.port == 8090  # actual default
     
     def test_settings_cors_configuration_scenarios(self):
