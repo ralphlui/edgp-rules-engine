@@ -2,7 +2,7 @@
 Simplified validation models for the rules engine.
 This module provides consistent input/output types across API and SQS interfaces.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timezone
 from enum import Enum
@@ -90,10 +90,104 @@ class ValidationSummary(BaseModel):
 # API REQUEST/RESPONSE MODELS
 # ============================================================================
 
+class APIDataEntry(BaseModel):
+    """
+    Incoming API data entry payload used for validation requests.
+    Supports both the new enhanced format and legacy variations.
+    """
+    data_type: DataType = Field(..., description="Type of data being validated")
+    domain_name: Optional[str] = Field(default=None, description="Domain name associated with the data")
+    file_id: Optional[str] = Field(default=None, description="Unique file identifier")
+    policy_id: Optional[str] = Field(default=None, description="Policy identifier")
+    data: Union[Dict[str, Any], List[Dict[str, Any]]] = Field(
+        ..., description="Data to validate (single record or list of records)"
+    )
+    validation_rules: Optional[List[ValidationRule]] = Field(
+        default=None,
+        description="Validation rules provided within the data entry payload"
+    )
+
+    @field_validator("data")
+    @classmethod
+    def validate_data(cls, value: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """Ensure data is provided as a dict or a list of dicts."""
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, list):
+            if all(isinstance(item, dict) for item in value):
+                return value
+            raise ValueError("Each item in data list must be an object")
+        raise ValueError("data must be an object or a list of objects")
+
+
 class ValidationRequest(BaseModel):
     """API validation request"""
     rules: List[ValidationRule] = Field(..., description="List of validation rules to apply")
     dataset: List[Dict[str, Any]] = Field(..., description="Dataset to validate")
+    data_entry: Optional[APIDataEntry] = Field(default=None, description="Original data entry payload")
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_enhanced_payload(cls, values: Any) -> Any:
+        """
+        Support enhanced payloads that provide a data_entry structure and/or
+        embed validation_rules alongside the data.
+        """
+        if not isinstance(values, dict):
+            return values
+
+        values = values.copy()
+
+        data_entry = values.get("data_entry")
+        # Allow validation rules to appear at the top level under validation_rules key
+        top_level_rules = values.get("validation_rules")
+
+        if isinstance(data_entry, dict):
+            # Extract validation rules from data_entry when present
+            entry_rules = data_entry.get("validation_rules")
+            if entry_rules is not None and "rules" not in values:
+                values["rules"] = entry_rules
+            elif top_level_rules is not None and "rules" not in values:
+                values["rules"] = top_level_rules
+
+            # Normalize dataset from data_entry.data
+            raw_data = data_entry.get("data")
+            normalized_dataset = cls._normalize_dataset(raw_data)
+            if "dataset" not in values:
+                values["dataset"] = normalized_dataset
+        elif top_level_rules is not None and "rules" not in values:
+            # Handle case where payload provides validation_rules without wrapping in data_entry
+            values["rules"] = top_level_rules
+
+        # If dataset is provided as a dict under "data", normalize it
+        if "dataset" not in values and "data" in values:
+            values["dataset"] = cls._normalize_dataset(values.get("data"))
+
+        return values
+
+    @staticmethod
+    def _normalize_dataset(raw_data: Any) -> List[Dict[str, Any]]:
+        """Convert raw data payloads into a list of dictionaries."""
+        if raw_data is None:
+            return []
+
+        # Handle dict wrapping records in a key such as "records"
+        if isinstance(raw_data, dict):
+            if "records" in raw_data:
+                records = raw_data["records"]
+                if not isinstance(records, list):
+                    raise ValueError("records must be provided as a list of objects")
+                if not all(isinstance(item, dict) for item in records):
+                    raise ValueError("Each record must be an object")
+                return records
+            return [raw_data]
+
+        if isinstance(raw_data, list):
+            if all(isinstance(item, dict) for item in raw_data):
+                return raw_data
+            raise ValueError("Each item in data list must be an object")
+
+        raise ValueError("Dataset must be an object or list of objects")
 
 class ValidationResponse(BaseModel):
     """API validation response"""

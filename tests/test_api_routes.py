@@ -126,6 +126,45 @@ class TestValidationEndpoint:
         assert "results" in data
         assert "summary" in data
         assert len(data["results"]) == 2
+
+    def test_validation_endpoint_with_data_entry_payload(self):
+        """Test validation accepts enhanced data_entry payload"""
+        payload = {
+            "data_entry": {
+                "data_type": "tabular",
+                "domain_name": "Customer",
+                "file_id": "cea76a16-0e57-4b99-88e3-a50747a4ec04",
+                "policy_id": "f1615b31-e86d-42b3-9f62-aa3d52f84f7a",
+                "data": {
+                    "address": "Calle Mayor 45, Madrid",
+                    "email": "carlos.gomez@example.com",
+                    "country": "Spain",
+                    "gender": "Male",
+                    "lastname": "Gomez",
+                    "firstname": "Carlos",
+                    "id": "5f4abb15-7586-4f12-9801-3638485fb2e1",
+                    "phone": "+34 612 345 678",
+                    "age": 31
+                },
+                "validation_rules": [
+                    {
+                        "rule_name": "expect_column_to_exist",
+                        "column_name": "firstname",
+                        "value": {},
+                        "rule_description": None
+                    }
+                ]
+            }
+        }
+
+        response = client.post("/api/rules/validate", json=payload)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_data = response.json()
+
+        assert response_data["summary"]["total_rules"] == 1
+        assert response_data["results"][0]["rule_name"] == "expect_column_to_exist"
+        assert response_data["results"][0]["success"] is True
     
     def test_validation_endpoint_invalid_request_body(self):
         """Test validation endpoint with invalid request body"""
